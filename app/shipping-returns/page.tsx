@@ -1,0 +1,25 @@
+import type { Metadata } from "next";
+import { PageHeader } from "@/components/page-header";
+import { formatPrice, site } from "@/lib/site";
+
+export const metadata: Metadata = { title: "Shipping & Returns" };
+
+export default function ShippingReturns() {
+  return (
+    <div className="mx-auto max-w-7xl gutter pb-24 pt-10">
+      <PageHeader title="Shipping & returns" />
+      <div className="prose-mv">
+        <h2 className="!mt-0">Delivery</h2>
+        <ul className="flex flex-col gap-2">
+          {site.shipping.map((s) => <li key={s.id}><strong>{s.label}:</strong> {s.eta}, {formatPrice(s.price)}.</li>)}
+        </ul>
+        <p>Standard delivery is free on orders over {formatPrice(site.freeShippingOver)}. Orders are packed and dispatched on working days, and you&apos;ll get tracking by email once your order ships.</p>
+        <h2>Returns</h2>
+        <p>Changed your mind? Send pieces back within {site.returnsDays} days of delivery. They need to be unworn and unwashed, with the tags still on.</p>
+        <p>To start a return, email <span className="font-mono">{site.email}</span> with your order number. We&apos;ll refund to your original payment method once the return reaches us.</p>
+        <h2>Exchanges</h2>
+        <p>Need a different size? Return the original and place a new order. It&apos;s the quickest way to get the size you want before it sells out.</p>
+      </div>
+    </div>
+  );
+}

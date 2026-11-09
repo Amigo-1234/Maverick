@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MAVERICK — DIFFERENT BY CHOICE.
 
-## Getting Started
+Online store for MAVERICK, a Nigerian menswear brand making oversized graphic tees, ringers and long sleeves.
 
-First, run the development server:
+Built with Next.js 16, React 19, Tailwind CSS 4 and GSAP.
+
+## Run it
+
+You need Node.js 20 or newer.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+To build for production:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## What's in the store
 
-## Learn More
+| Page | Route |
+| --- | --- |
+| Home: clothing rail hero, shop by cut, new in, spotlight, lookbook marquee | `/` |
+| Collections with colour filter and sorting | `/collections/all`, `/collections/new`, `/collections/tees`, `/collections/ringers`, `/collections/long-sleeves` |
+| Product pages: front/back gallery, sizes, add to bag, Order on WhatsApp | `/products/[slug]` |
+| Bag (slide-out drawer and full page) | `/cart` |
+| Checkout (test mode) and order confirmation | `/checkout`, `/checkout/success` |
+| Search | `/search` |
+| Lookbook, About, Size guide, Shipping & returns, FAQ, Contact | `/lookbook`, `/about`, `/size-guide`, `/shipping-returns`, `/faq`, `/contact` |
 
-To learn more about Next.js, take a look at the following resources:
+The navbar is a full-screen GSAP menu, and a floating WhatsApp button opens a chat on every page except checkout.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Where things live
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| To change… | Edit |
+| --- | --- |
+| Products: names, prices, sizes, descriptions, images | `lib/catalog.ts` |
+| Currency, delivery rates, free-delivery threshold, returns, size chart, socials, email | `lib/site.ts` |
+| Colours, fonts and shared styles | `app/globals.css` |
+| Navbar and full-screen menu | `components/site-header.tsx` |
+| Clothing rail hero (supplied component, unmodified) | `components/clothing-rail-hero.tsx` |
+| Icons (SVG) and the logo mark | `components/icons.tsx` |
 
-## Deploy on Vercel
+## Before launch
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+These are **placeholders**. Replace them with real values:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Prices**: currently ₦25,000–₦32,000 in `lib/catalog.ts`.
+- **Sizes and stock**: all pieces are listed as S–XXL and in stock.
+- **Delivery and returns**: Lagos ₦3,500, Nationwide ₦6,000, free over ₦100,000, 7-day returns, all set in `lib/site.ts`.
+- **Size chart measurements**: in `lib/site.ts`.
+- **Contact email**: `hello@maverick.example` in `lib/site.ts`.
+- **Payments**: checkout runs in test mode and takes no money. Connect Paystack or Flutterwave before going live.
+- **Newsletter and contact forms**: they show a success message but don't send anywhere yet. They need an email service.
+
+## Images
+
+All imagery is the client's own:
+
+- `source-images/`: the original garment photos and the logo.
+- `public/originals/`: the photos shown on the site, unedited.
+- `public/garments/`: transparent cut-outs made from those photos.
+- `public/brand/`: the logo, plus a vector version traced from it.
+
+To regenerate the derived images after changing a photo:
+
+```bash
+node scripts/cutouts.mjs      # garment cut-outs
+node scripts/trace-logo.mjs   # vector logo
+```
+
+## Tests
+
+End-to-end checks run in your installed Google Chrome against a running build:
+
+```bash
+npm run build && npx next start -p 3123
+node scripts/e2e-shop.mjs   # bag, sorting, search, checkout, WhatsApp, phone layout
+node scripts/e2e-menu.mjs   # navbar menu: open, close, focus, links
+```
+
+## Contact
+
+- TikTok: [@maverickwear1](https://www.tiktok.com/@maverickwear1)
+- WhatsApp: +234 702 524 4302

@@ -1,26 +1,179 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* Dark utilities only apply inside a .dark wrapper. The store commits to one look:
+   studio-grey floor, Maverick black, paper white, electric blue for action. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #ecebe7;      /* studio floor */
+  --foreground: #0b0b0c;      /* Maverick black */
+  --card: #ffffff;
+  --card-foreground: #0b0b0c;
+  --muted-foreground: #64635f;
+  --border: #d3d1cb;
+  --ring: #1c3fff;
+  --ink: #0b0b0c;
+  --paper: #f7f6f3;
+  --studio: #dfddd8;          /* product backdrop */
+  --accent-blue: #1c3fff;
+  --accent-red: #d4211a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-studio: var(--studio);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-red: var(--accent-red);
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-anton), Impact, "Arial Narrow", sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html { color-scheme: light; }
+body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
+h1, h2, h3 { text-wrap: balance; }
+
+@layer components {
+  /* Side gutter that also clears a phone's side system bar. */
+  .gutter {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
+  @media (min-width: 768px) { .gutter { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
+
+  /* The blade cut: top-left and bottom-right corners chamfered, echoing the lettering. */
+  .cut { clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
+  .cut-sm { clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+
+  .btn, .btn-ghost, .btn-light {
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+    padding: .85rem 1.4rem; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    transition: background-color .2s, color .2s;
+    outline-offset: 3px;
+  }
+  .btn { background: var(--ink); color: var(--paper); }
+  .btn:hover { background: var(--accent-blue); }
+  .btn-ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .btn-ghost:hover { background: var(--ink); color: var(--paper); }
+  .btn-light { background: var(--paper); color: var(--ink); }
+  .btn-light:hover { background: var(--accent-blue); color: var(--paper); }
+  .btn:focus-visible, .btn-ghost:focus-visible, .btn-light:focus-visible { outline: 2px solid var(--ring); }
+
+  .field { display: flex; flex-direction: column; gap: .35rem; }
+  .field label { font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+  .field input, .field select, .field textarea {
+    background: var(--paper); border: 1.5px solid color-mix(in oklab, var(--ink) 20%, transparent);
+    padding: .75rem .85rem; font-size: 15px; outline: none; border-radius: 0;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--ink); }
+
+  /* Prices: sans face so the naira sign matches the digits. */
+  .price { font-family: var(--font-sans); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+
+  .prose-mv { display: flex; flex-direction: column; gap: 1rem; font-size: 15px; line-height: 1.7; max-width: 65ch; }
+  .prose-mv h2 { font-family: var(--font-display); text-transform: uppercase; font-size: 1.9rem; line-height: 1; margin-top: 1.5rem; }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within { scroll-behavior: auto; }
 }
+
+/* Lookbook marquee: two identical sets slide left by exactly one set, so the loop is seamless.
+   Pauses on hover and keyboard focus; becomes a swipeable row when motion is reduced. */
+@keyframes marquee { to { transform: translateX(-50%); } }
+.marquee-track { animation: marquee 60s linear infinite; }
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee { overflow-x: auto; }
+  .marquee-track { animation: none; }
+  .marquee-track > ul[aria-hidden] { display: none; }
+}
+
+/* ───────────── Navbar: full-screen menu (GSAP drives the motion) ───────────── */
+.nav-close-btn {
+  display: inline-flex; align-items: center; gap: .6rem; margin-left: .25rem;
+  height: 40px; padding: 0 .95rem; background: var(--ink); color: var(--paper);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  cursor: pointer; transition: background-color .2s;
+}
+.nav-close-btn:hover { background: var(--accent-blue); }
+.nav-close-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.menu-button-text { height: 1em; overflow: hidden; display: flex; flex-direction: column; line-height: 1; }
+.menu-button-text .p-large { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; line-height: 1; height: 1em; }
+.icon-wrap { width: 14px; height: 14px; display: grid; place-items: center; }
+.menu-button-icon { width: 14px; height: 14px; display: block; }
+
+.nav-overlay-wrapper { position: fixed; inset: 0; z-index: 55; display: none; }
+.overlay { position: absolute; inset: 0; background: color-mix(in oklab, var(--ink) 55%, transparent); cursor: pointer; }
+.menu-content {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(640px, 100%);
+  display: flex; overflow: hidden; color: var(--paper);
+}
+.menu-bg { position: absolute; inset: 0; }
+.backdrop-layer { position: absolute; inset: 0; background: var(--ink); }
+.backdrop-layer.first { background: var(--accent-blue); }
+.backdrop-layer.second { background: var(--paper); }
+.ambient-background-shapes { position: absolute; inset: 0; pointer-events: none; }
+.bg-shape { position: absolute; right: -6%; bottom: 4%; width: 78%; height: 62%; opacity: 0; overflow: visible; }
+.bg-shape.active { opacity: 1; }
+.shape-element { transform-box: fill-box; }
+
+.menu-content-wrapper {
+  position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;
+  width: 100%; height: 100%; overflow-y: auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 96px) max(24px, calc(env(safe-area-inset-right, 0px) + 24px)) max(24px, calc(env(safe-area-inset-bottom, 0px) + 24px)) 32px;
+}
+.menu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.menu-list-item { overflow: hidden; border-bottom: 1px solid color-mix(in oklab, var(--paper) 12%, transparent); }
+.nav-link {
+  position: relative; display: grid; grid-template-columns: 2.4rem 1fr auto; align-items: baseline; gap: .75rem;
+  padding: .35rem .5rem .2rem; color: var(--paper); text-decoration: none; transform-origin: 0% 100%;
+}
+.nav-link:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.nav-link-index, .nav-link-note {
+  position: relative; z-index: 1; font-family: var(--font-mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+  color: color-mix(in oklab, var(--paper) 50%, transparent); transition: color .3s;
+}
+.nav-link-text {
+  position: relative; z-index: 1; margin: 0; font-family: var(--font-display); text-transform: uppercase;
+  font-size: clamp(2.3rem, min(7.4vh, 9vw), 4.6rem); line-height: 1.02; letter-spacing: .005em; transition: transform .45s cubic-bezier(.65,.01,.05,.99);
+}
+.nav-link-hover-bg {
+  position: absolute; inset: 0; background: var(--accent-blue); transform: scaleY(0); transform-origin: 50% 100%;
+  transition: transform .45s cubic-bezier(.65,.01,.05,.99); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.nav-link:hover .nav-link-hover-bg, .nav-link:focus-visible .nav-link-hover-bg { transform: scaleY(1); }
+.nav-link:hover .nav-link-text, .nav-link:focus-visible .nav-link-text { transform: translateX(.4rem); }
+.nav-link:hover .nav-link-index, .nav-link:hover .nav-link-note, .nav-link:focus-visible .nav-link-note { color: var(--paper); }
+.nav-link[aria-current="page"] .nav-link-index { color: var(--accent-blue); }
+.nav-link[aria-current="page"]:hover .nav-link-index { color: var(--paper); }
+
+.menu-footer { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1.4rem; }
+.menu-social {
+  display: inline-flex; align-items: center; gap: .5rem; color: var(--paper); font-size: 13px; font-weight: 600;
+  padding: .55rem .8rem; border: 1px solid color-mix(in oklab, var(--paper) 25%, transparent); transition: border-color .2s, color .2s;
+}
+.menu-social:hover { border-color: var(--paper); color: var(--accent-blue); }
+.menu-social:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.menu-slogan { margin: 0 0 0 auto; font-family: var(--font-mono); font-size: 11px; letter-spacing: .22em; color: color-mix(in oklab, var(--paper) 55%, transparent); }
+@media (max-width: 520px) {
+  .nav-link { grid-template-columns: 1.8rem 1fr; }
+  .nav-link-note { display: none; }
+  .menu-content-wrapper { padding-left: 20px; }
+  .menu-slogan { margin-left: 0; width: 100%; }
+}
+/* Header sits above the open menu so its Close button stays usable; keep it dark there. */
+.site-header.z-\[57\] { background: var(--ink); color: var(--paper); border-color: transparent; }
+.site-header.z-\[57\] .nav-close-btn { background: var(--paper); color: var(--ink); }
+.site-header.z-\[57\] [data-bag-count] { background: var(--paper); color: var(--ink); }
