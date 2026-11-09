@@ -86,4 +86,5 @@ node scripts/e2e-menu.mjs   # navbar menu: open, close, focus, links
 ## Contact
 
 - TikTok: [@maverickwear1](https://www.tiktok.com/@maverickwear1)
+- Snapchat: [maverick267153](https://www.snapchat.com/add/maverick267153)
 - WhatsApp: +234 702 524 4302

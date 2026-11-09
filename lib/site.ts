@@ -17,6 +17,7 @@ export const site = {
   announcement: "DROP 01 IS LIVE",
   socials: {
     tiktok: { handle: "@maverickwear1", url: "https://www.tiktok.com/@maverickwear1" },
+    snapchat: { handle: "maverick267153", url: "https://www.snapchat.com/add/maverick267153" },
     whatsapp: { display: "+234 702 524 4302", number: "2347025244302" },
   },
 };

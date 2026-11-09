@@ -11,7 +11,7 @@ import { usePathname, useRouter } from "next/navigation";
 import gsap from "gsap";
 import { CustomEase } from "gsap/CustomEase";
 import { useCart } from "./cart/cart-context";
-import { BagIcon, LogoMark, SearchIcon, TikTokIcon, WhatsAppIcon } from "./icons";
+import { BagIcon, LogoMark, SearchIcon, SnapchatIcon, TikTokIcon, WhatsAppIcon } from "./icons";
 import { LOGO_PATH, LOGO_VIEWBOX } from "./logo-path";
 import { COLLECTIONS, products } from "@/lib/catalog";
 import { site, whatsappLink } from "@/lib/site";
@@ -306,6 +306,7 @@ export function SiteHeader() {
               </ul>
               <div className="menu-footer">
                 <a data-menu-fade href={site.socials.tiktok.url} target="_blank" rel="noopener noreferrer" className="menu-social"><TikTokIcon size={18} /> {site.socials.tiktok.handle}</a>
+                <a data-menu-fade href={site.socials.snapchat.url} target="_blank" rel="noopener noreferrer" className="menu-social"><SnapchatIcon size={18} /> {site.socials.snapchat.handle}</a>
                 <a data-menu-fade href={whatsappLink("Hi MAVERICK!")} target="_blank" rel="noopener noreferrer" className="menu-social"><WhatsAppIcon size={18} /> {site.socials.whatsapp.display}</a>
                 <p data-menu-fade className="menu-slogan">{site.slogan}</p>
               </div>

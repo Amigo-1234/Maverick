@@ -79,6 +79,8 @@ ok(wa.startsWith("https://wa.me/2347025244302") && decodeURIComponent(wa).includ
 ok(await page.getByRole("link", { name: "Chat with MAVERICK on WhatsApp" }).isVisible(), "floating WhatsApp button is visible");
 const tt = await page.locator("footer a[href*=tiktok]").getAttribute("href");
 ok(tt === "https://www.tiktok.com/@maverickwear1", "footer links to TikTok @maverickwear1");
+const sc = await page.locator("footer a[href*=snapchat]").getAttribute("href");
+ok(sc === "https://www.snapchat.com/add/maverick267153", "footer links to Snapchat maverick267153");
 
 // phone layout: no sideways scroll on key pages
 await page.setViewportSize({ width: 390, height: 844 });

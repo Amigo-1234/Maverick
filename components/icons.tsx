@@ -40,6 +40,14 @@ export function TikTokIcon({ size = 20, ...rest }: P) {
   );
 }
 
+export function SnapchatIcon({ size = 20, ...rest }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...rest}>
+      <path fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" d="M12 2.8c3.1 0 5.2 2.3 5.2 5.4v2.2c.5.2 1.1.1 1.6-.1.5-.2.9.2.8.6-.1.5-1.1.9-1.9 1.2.4 1.6 1.8 3 3.5 3.5.3.1.4.5.1.7-.7.5-1.7.6-2.3.8-.2.5-.1 1-.6 1.1-.7.1-1.5-.3-2.6.1-1 .4-1.8 1.4-3.8 1.4s-2.8-1-3.8-1.4c-1.1-.4-1.9 0-2.6-.1-.5-.1-.4-.6-.6-1.1-.6-.2-1.6-.3-2.3-.8-.3-.2-.2-.6.1-.7 1.7-.5 3.1-1.9 3.5-3.5-.8-.3-1.8-.7-1.9-1.2-.1-.4.3-.8.8-.6.5.2 1.1.3 1.6.1V8.2c0-3.1 2.1-5.4 5.2-5.4z" />
+    </svg>
+  );
+}
+
 /** The client's horned M, traced from their logo artwork (scripts/trace-logo.mjs). */
 export function LogoMark({ size = 28, ...rest }: P) {
   return (

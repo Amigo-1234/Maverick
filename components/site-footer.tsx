@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRightIcon, TikTokIcon, WhatsAppIcon } from "./icons";
+import { ArrowRightIcon, SnapchatIcon, TikTokIcon, WhatsAppIcon } from "./icons";
 import { site, whatsappLink } from "@/lib/site";
 
 const columns = [
@@ -20,6 +20,12 @@ export function Socials({ className = "" }: { className?: string }) {
         <a href={site.socials.tiktok.url} target="_blank" rel="noopener noreferrer" className={item}>
           <TikTokIcon size={20} />
           <span className="flex flex-col leading-tight"><span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-60">TikTok</span><span className="text-sm font-semibold">{site.socials.tiktok.handle}</span></span>
+        </a>
+      </li>
+      <li>
+        <a href={site.socials.snapchat.url} target="_blank" rel="noopener noreferrer" className={item}>
+          <SnapchatIcon size={20} />
+          <span className="flex flex-col leading-tight"><span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-60">Snapchat</span><span className="text-sm font-semibold">{site.socials.snapchat.handle}</span></span>
         </a>
       </li>
       <li>

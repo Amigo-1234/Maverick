@@ -109,8 +109,8 @@ h1, h2, h3 { text-wrap: balance; }
 }
 .nav-close-btn:hover { background: var(--accent-blue); }
 .nav-close-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-.menu-button-text { height: 1em; overflow: hidden; display: flex; flex-direction: column; line-height: 1; }
-.menu-button-text .p-large { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; line-height: 1; height: 1em; }
+.menu-button-text { font-size: 12px; line-height: 1.2; height: 1.2em; overflow: hidden; display: flex; flex-direction: column; }
+.menu-button-text .p-large { margin: 0; flex: none; font-size: inherit; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; line-height: inherit; height: 1.2em; }
 .icon-wrap { width: 14px; height: 14px; display: grid; place-items: center; }
 .menu-button-icon { width: 14px; height: 14px; display: block; }
 

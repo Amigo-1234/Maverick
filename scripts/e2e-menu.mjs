@@ -9,6 +9,12 @@ const ok = (c, m) => { console.log(`${c ? "PASS" : "FAIL"}  ${m}`); if (!c) proc
 await p.goto(base + "/"); await p.waitForLoadState("networkidle");
 const btn = p.locator(".nav-close-btn");
 ok(!(await p.locator(".nav-overlay-wrapper").isVisible()), "menu starts closed");
+const peek = await p.evaluate(() => {
+  const box = document.querySelector(".menu-button-text").getBoundingClientRect();
+  const close = document.querySelectorAll(".menu-button-text p")[1].getBoundingClientRect();
+  return close.top >= box.bottom - 0.5;
+});
+ok(peek, "closed button shows only MENU (CLOSE is fully hidden)");
 await btn.click();
 await p.waitForTimeout(250); await p.screenshot({ path: `${shots}/menu-mid.png` });
 await p.waitForTimeout(1300);
