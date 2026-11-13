@@ -8,7 +8,7 @@ import { site, whatsappLink } from "@/lib/site";
 
 const columns = [
   { title: "Shop", links: [["Shop All", "/collections/all"], ["New In", "/collections/new"], ["Tees", "/collections/tees"], ["Ringers", "/collections/ringers"], ["Long Sleeves", "/collections/long-sleeves"]] },
-  { title: "Help", links: [["Size Guide", "/size-guide"], ["Shipping & Returns", "/shipping-returns"], ["FAQ", "/faq"], ["Contact", "/contact"]] },
+  { title: "Help", links: [["Size Guide", "/size-guide"], ["Shipping & Returns", "/shipping-returns"], ["FAQ", "/faq"], ["Contact", "/contact"], ["Terms of Sale", "/terms"], ["Privacy Policy", "/privacy"]] },
   { title: "Maverick", links: [["About", "/about"], ["Lookbook", "/lookbook"]] },
 ];
 
@@ -40,6 +40,20 @@ export function Socials({ className = "" }: { className?: string }) {
 
 export function SiteFooter() {
   const [done, setDone] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const join = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "We couldn't add you just now.");
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "We couldn't add you just now.");
+    } finally { setBusy(false); }
+  };
   return (
     <footer className="bg-ink text-paper">
       <div className="mx-auto grid max-w-7xl gap-12 gutter py-16 lg:grid-cols-[1.3fr_2fr]">
@@ -49,10 +63,14 @@ export function SiteFooter() {
           {done ? (
             <p className="font-mono text-sm uppercase tracking-[0.16em] text-accent-blue" role="status">You&apos;re on the list.</p>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); setDone(true); }} className="flex max-w-md gap-2">
-              <label htmlFor="newsletter-email" className="sr-only">Email address</label>
-              <input id="newsletter-email" type="email" required placeholder="Email address" className="min-w-0 flex-1 border border-paper/30 bg-transparent px-3 py-3 text-sm outline-none placeholder:text-paper/40 focus:border-paper" />
-              <button type="submit" className="btn-light" aria-label="Join the list"><ArrowRightIcon size={18} /></button>
+            <form onSubmit={join} className="flex max-w-md flex-col gap-2">
+              <div className="flex gap-2">
+                <label htmlFor="newsletter-email" className="sr-only">Email address</label>
+                <input id="newsletter-email" name="email" type="email" required placeholder="Email address" className="min-w-0 flex-1 border border-paper/30 bg-transparent px-3 py-3 text-sm outline-none placeholder:text-paper/40 focus:border-paper" />
+                <input name="company" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-0 w-0" />
+                <button type="submit" disabled={busy} className="btn-light disabled:opacity-60" aria-label="Join the list"><ArrowRightIcon size={18} /></button>
+              </div>
+              {error && <p role="alert" className="text-[13px] text-paper/80">{error}</p>}
             </form>
           )}
           <div className="mt-4 flex flex-col gap-3">

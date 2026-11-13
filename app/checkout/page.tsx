@@ -3,19 +3,38 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCart } from "@/components/cart/cart-context";
-import { NIGERIAN_STATES, formatPrice, site } from "@/lib/site";
+import { ShieldIcon } from "@/components/icons";
+import { NIGERIAN_STATES, formatPrice, site, whatsappLink } from "@/lib/site";
 import { tight } from "@/lib/catalog";
+import { deliveryFor } from "@/lib/order";
+import { track } from "@/lib/track";
+
+const DRAFT_KEY = "maverick-checkout-draft";
+const FIELDS = ["email", "firstName", "lastName", "address1", "address2", "city", "state", "postcode", "country", "phone"] as const;
 
 export default function CheckoutPage() {
-  const { items, subtotal, ready, clear } = useCart();
-  const router = useRouter();
+  const { items, subtotal, ready } = useCart();
+  const formRef = React.useRef<HTMLFormElement>(null);
   const [method, setMethod] = React.useState(site.shipping[0]!.id);
   const [busy, setBusy] = React.useState(false);
-  const option = site.shipping.find((s) => s.id === method) ?? site.shipping[0]!;
-  const delivery = subtotal >= site.freeShippingOver ? 0 : option.price;
-  const total = subtotal + delivery;
+  const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
+  const shipping = deliveryFor(subtotal, method) ?? deliveryFor(subtotal, site.shipping[0]!.id)!;
+  const total = subtotal + shipping.price;
+
+  // Restore what the customer typed (e.g. after cancelling on Paystack) and explain why they're back.
+  React.useEffect(() => {
+    if (!ready || !formRef.current) return;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null") as Record<string, string> | null;
+      if (draft) {
+        for (const f of FIELDS) { const el = formRef.current.elements.namedItem(f) as HTMLInputElement | null; if (el && draft[f]) el.value = draft[f]; }
+        if (draft.shipping) setMethod(draft.shipping);
+      }
+    } catch {}
+    if (new URLSearchParams(window.location.search).has("cancelled")) setNotice("Payment cancelled. Nothing was charged, and your bag and details are saved.");
+  }, [ready]);
 
   if (!ready) return <div className="min-h-[60vh]" />;
   if (items.length === 0) {
@@ -28,32 +47,41 @@ export default function CheckoutPage() {
     );
   }
 
-  const submit = (e: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setBusy(true);
+    setError(null); setNotice(null); setBusy(true);
     const form = new FormData(e.currentTarget);
-    const order = {
-      id: `MV-${Date.now().toString(36).toUpperCase().slice(-6)}`,
-      email: String(form.get("email")),
-      name: `${form.get("firstName")} ${form.get("lastName")}`,
-      address: [form.get("address1"), form.get("address2"), form.get("city"), form.get("state"), form.get("postcode"), form.get("country")].filter(Boolean).join(", "),
-      delivery: { label: option.label, eta: option.eta, price: delivery },
-      lines: items.map((i) => ({ name: i.product.name, colour: i.product.colour, size: i.size, qty: i.qty, total: i.total, image: tight(i.product.front) })),
-      subtotal, total,
-    };
-    try { sessionStorage.setItem("maverick-last-order", JSON.stringify(order)); } catch {}
-    clear();
-    router.push("/checkout/success");
+    const customer = Object.fromEntries(FIELDS.map((f) => [f, String(form.get(f) ?? "")]));
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...customer, shipping: method })); } catch {}
+    track("InitiateCheckout", { value: total, contents: items.map((i) => ({ id: i.slug, qty: i.qty, price: i.product.price })) });
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: { ...customer, marketing: form.get("marketing") === "on" },
+          lines: items.map((i) => ({ slug: i.slug, size: i.size, qty: i.qty })),
+          shipping: method,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error || "Something went wrong. Please try again.");
+      window.location.assign(data.url); // Paystack's secure payment page
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setBusy(false);
+    }
   };
 
   return (
     <div className="mx-auto max-w-7xl gutter pb-24 pt-10">
       <h1 className="mb-8 font-display text-[clamp(3rem,8vw,6rem)] uppercase leading-[0.85]">Checkout</h1>
-      <form onSubmit={submit} className="grid gap-10 lg:grid-cols-[1.5fr_1fr]">
+      {notice && <p role="status" className="mb-6 border-l-4 border-accent-blue bg-paper px-4 py-3 text-sm">{notice}</p>}
+      <form ref={formRef} onSubmit={submit} className="grid gap-10 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-10">
           <fieldset className="flex flex-col gap-4">
             <legend className="mb-4 font-display text-3xl uppercase">1. Contact</legend>
-            <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" required autoComplete="email" /></div>
+            <div className="field"><label htmlFor="email">Email (for your receipt)</label><input id="email" name="email" type="email" required autoComplete="email" /></div>
             <label className="flex items-center gap-2 text-sm"><input id="marketing" name="marketing" type="checkbox" className="size-4 accent-[var(--ink)]" /> Email me about new drops</label>
           </fieldset>
           <fieldset className="grid gap-4 sm:grid-cols-2">
@@ -61,35 +89,38 @@ export default function CheckoutPage() {
             <div className="field"><label htmlFor="firstName">First name</label><input id="firstName" name="firstName" required autoComplete="given-name" /></div>
             <div className="field"><label htmlFor="lastName">Last name</label><input id="lastName" name="lastName" required autoComplete="family-name" /></div>
             <div className="field sm:col-span-2"><label htmlFor="address1">Address</label><input id="address1" name="address1" required autoComplete="address-line1" /></div>
-            <div className="field sm:col-span-2"><label htmlFor="address2">Apartment, suite (optional)</label><input id="address2" name="address2" autoComplete="address-line2" /></div>
+            <div className="field sm:col-span-2"><label htmlFor="address2">Apartment, suite, landmark (optional)</label><input id="address2" name="address2" autoComplete="address-line2" /></div>
             <div className="field"><label htmlFor="city">City</label><input id="city" name="city" required autoComplete="address-level2" /></div>
             <div className="field"><label htmlFor="state">State</label><select id="state" name="state" required defaultValue="Lagos" autoComplete="address-level1">{NIGERIAN_STATES.map((st) => <option key={st}>{st}</option>)}</select></div>
             <div className="field"><label htmlFor="postcode">Postal code (optional)</label><input id="postcode" name="postcode" autoComplete="postal-code" /></div>
             <div className="field"><label htmlFor="country">Country</label>
-              <select id="country" name="country" defaultValue="Nigeria" autoComplete="country-name"><option>Nigeria</option><option>Ghana</option><option>United Kingdom</option><option>United States</option><option>Other</option></select>
+              <select id="country" name="country" defaultValue="Nigeria" autoComplete="country-name"><option>Nigeria</option></select>
             </div>
-            <div className="field"><label htmlFor="phone">Phone number (for the rider)</label><input id="phone" name="phone" type="tel" required placeholder="0803 000 0000" autoComplete="tel" /></div>
+            <div className="field sm:col-span-2"><label htmlFor="phone">Phone number (for the rider)</label><input id="phone" name="phone" type="tel" required placeholder="0803 000 0000" autoComplete="tel" /></div>
           </fieldset>
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-4 font-display text-3xl uppercase">3. Delivery method</legend>
             {site.shipping.map((s) => {
-              const free = subtotal >= site.freeShippingOver;
+              const price = deliveryFor(subtotal, s.id)!.price;
               return (
                 <label key={s.id} htmlFor={`ship-${s.id}`} className={`flex cursor-pointer items-center justify-between gap-4 border-[1.5px] px-4 py-4 ${method === s.id ? "border-foreground bg-paper" : "border-foreground/20"}`}>
                   <span className="flex items-center gap-3">
                     <input id={`ship-${s.id}`} type="radio" name="shipping" value={s.id} checked={method === s.id} onChange={() => setMethod(s.id)} className="size-4 accent-[var(--ink)]" />
                     <span><span className="block font-semibold">{s.label}</span><span className="text-[13px] text-muted-foreground">{s.eta}</span></span>
                   </span>
-                  <span className="price text-sm tabular-nums">{free ? "Free" : formatPrice(s.price)}</span>
+                  <span className="price text-sm">{price === 0 ? "Free" : formatPrice(price)}</span>
                 </label>
               );
             })}
           </fieldset>
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-4 font-display text-3xl uppercase">4. Payment</legend>
-            <div className="border-[1.5px] border-dashed border-foreground/30 bg-paper p-5 text-sm leading-relaxed">
-              <p className="font-semibold uppercase tracking-[0.12em]">Test mode</p>
-              <p className="mt-1 text-muted-foreground">Payments aren&apos;t connected yet, so placing an order here takes no money and ships nothing. Card, bank transfer and USSD payments will appear here once Paystack or Flutterwave is connected.</p>
+            <div className="flex items-start gap-3 border-[1.5px] border-foreground/20 bg-paper p-5 text-sm leading-relaxed">
+              <ShieldIcon size={22} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Pay securely with Paystack</p>
+                <p className="mt-1 text-muted-foreground">Card, bank transfer or USSD. You&apos;ll go to Paystack to pay, then come straight back here. We never see your card details.</p>
+              </div>
             </div>
           </fieldset>
         </div>
@@ -104,16 +135,23 @@ export default function CheckoutPage() {
                   <span className="absolute -right-2 -top-2 grid size-5 place-items-center bg-ink font-mono text-[10px] text-paper">{i.qty}</span>
                 </div>
                 <div className="min-w-0 flex-1 text-sm"><p className="font-semibold uppercase">{i.product.name}</p><p className="text-muted-foreground">{i.product.colour} · {i.size}</p></div>
-                <span className="price text-sm tabular-nums">{formatPrice(i.total)}</span>
+                <span className="price text-sm">{formatPrice(i.total)}</span>
               </li>
             ))}
           </ul>
           <dl className="flex flex-col gap-2 border-t border-border pt-4 text-sm">
-            <div className="flex justify-between"><dt>Subtotal</dt><dd className="price tabular-nums">{formatPrice(subtotal)}</dd></div>
-            <div className="flex justify-between"><dt>Delivery</dt><dd className="price tabular-nums">{delivery === 0 ? "Free" : formatPrice(delivery)}</dd></div>
-            <div className="flex justify-between border-t border-border pt-3 text-base font-semibold"><dt className="uppercase tracking-[0.1em]">Total</dt><dd className="price tabular-nums">{formatPrice(total)}</dd></div>
+            <div className="flex justify-between"><dt>Subtotal</dt><dd className="price">{formatPrice(subtotal)}</dd></div>
+            <div className="flex justify-between"><dt>Delivery</dt><dd className="price">{shipping.price === 0 ? "Free" : formatPrice(shipping.price)}</dd></div>
+            <div className="flex justify-between border-t border-border pt-3 text-base font-semibold"><dt className="uppercase tracking-[0.1em]">Total</dt><dd className="price">{formatPrice(total)}</dd></div>
           </dl>
-          <button type="submit" disabled={busy} className="btn w-full py-4 disabled:opacity-60">{busy ? "Placing order…" : `Place test order — ${formatPrice(total)}`}</button>
+          {error && (
+            <div role="alert" className="border-l-4 border-accent-red bg-background px-4 py-3 text-sm">
+              <p className="font-semibold">{error}</p>
+              <a href={whatsappLink(`Hi MAVERICK, I had trouble paying on the website.`)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block underline underline-offset-4">Order on WhatsApp instead</a>
+            </div>
+          )}
+          <button type="submit" disabled={busy} className="btn w-full py-4 disabled:opacity-60">{busy ? "Opening Paystack…" : `Pay ${formatPrice(total)}`}</button>
+          <p className="text-[12px] leading-relaxed text-muted-foreground">By paying you agree to our <Link href="/terms" className="underline underline-offset-2">Terms of Sale</Link> and <Link href="/privacy" className="underline underline-offset-2">Privacy Policy</Link>.</p>
           <Link href="/cart" className="text-center text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-accent-blue">Back to bag</Link>
         </aside>
       </form>

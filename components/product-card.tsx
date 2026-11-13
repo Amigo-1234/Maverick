@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { tight, type Product } from "@/lib/catalog";
+import { inStock, tight, type Product } from "@/lib/catalog";
 import { formatPrice } from "@/lib/site";
 import { useCart } from "./cart/cart-context";
 
@@ -27,7 +27,7 @@ export function ProductCard({ product, priority = false }: { product: Product; p
               <p className="px-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Pick a size</p>
               <div className="grid grid-cols-5 gap-1">
                 {product.sizes.map((s) => (
-                  <button key={s} type="button" onClick={() => { add(product.slug, s); setQuick(false); }} className="border border-foreground/20 py-2 text-[12px] font-semibold hover:bg-foreground hover:text-background focus-visible:outline-2 focus-visible:outline-ring">{s}</button>
+                  <button key={s} type="button" disabled={!inStock(product, s)} aria-label={inStock(product, s) ? `Size ${s}` : `Size ${s}, sold out`} onClick={() => { add(product.slug, s); setQuick(false); }} className="border border-foreground/20 py-2 text-[12px] font-semibold enabled:hover:bg-foreground enabled:hover:text-background focus-visible:outline-2 focus-visible:outline-ring disabled:text-muted-foreground/50 disabled:line-through">{s}</button>
                 ))}
               </div>
             </div>

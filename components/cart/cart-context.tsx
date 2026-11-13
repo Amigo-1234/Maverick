@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { getProduct, type Product } from "@/lib/catalog";
+import { track } from "@/lib/track";
 
 export type Line = { slug: string; size: string; qty: number };
 export type CartItem = Line & { product: Product; total: number };
@@ -41,6 +42,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [lines, ready]);
 
   const add = React.useCallback((slug: string, size: string, qty = 1) => {
+    const p = getProduct(slug);
+    if (p) track("AddToCart", { value: p.price * qty, contents: [{ id: slug, qty, price: p.price }] });
     setLines((old) => {
       const hit = old.find((l) => l.slug === slug && l.size === size);
       if (hit) return old.map((l) => (l === hit ? { ...l, qty: Math.min(10, l.qty + qty) } : l));

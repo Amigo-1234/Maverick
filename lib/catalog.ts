@@ -28,6 +28,8 @@ export interface Product {
   summary: string;
   description: string;
   details: string[];
+  /** Units in stock per size. Leave out to treat every size as in stock; set a size to 0 to mark it sold out. */
+  stock?: Partial<Record<string, number>>;
 }
 
 export const SIZES = ["S", "M", "L", "XL", "XXL"];
@@ -166,6 +168,8 @@ export const COLLECTIONS: Record<string, { title: string; blurb: string; filter:
 export const tight = (src: string) => src.replace(/\.png$/, "-tight.png");
 
 export const getProduct = (slug: string) => products.find((p) => p.slug === slug);
+/** True when a size can be bought (no stock list means in stock). */
+export const inStock = (p: Product, size: string) => p.sizes.includes(size) && (p.stock?.[size] ?? 1) > 0;
 export const fullName = (p: Product) => `${p.name} — ${p.colour}`;
 export const related = (p: Product, n = 4) =>
   [...products.filter((x) => x.slug !== p.slug && x.category === p.category), ...products.filter((x) => x.slug !== p.slug && x.category !== p.category)].slice(0, n);

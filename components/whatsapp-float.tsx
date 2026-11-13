@@ -4,10 +4,10 @@ import { usePathname } from "next/navigation";
 import { WhatsAppIcon } from "./icons";
 import { whatsappLink } from "@/lib/site";
 
-/** Floating WhatsApp chat button, bottom-right on every page except checkout. */
+/** Floating WhatsApp chat button, bottom-right on every page except checkout and admin. */
 export function WhatsAppFloat() {
   const pathname = usePathname();
-  if (pathname?.startsWith("/checkout")) return null;
+  if (pathname?.startsWith("/checkout") || pathname?.startsWith("/admin")) return null;
   return (
     <a
       href={whatsappLink("Hi MAVERICK, I have a question.")}

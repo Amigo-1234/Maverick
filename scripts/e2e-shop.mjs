@@ -6,14 +6,14 @@ const browser = await chromium.launch({ executablePath: "/Applications/Google Ch
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("console", (m) => { if (m.type() === "error" && !m.text().includes("503")) errors.push(m.text()); }); // 503 = payments intentionally off in this run
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) process.exitCode = 1; };
 
 await page.goto(`${base}/products/strike-tee-black-blue`);
 await page.waitForLoadState("networkidle");
 await page.getByRole("button", { name: /Add to bag/ }).click();
 ok(await page.getByText("Choose a size first.").isVisible(), "asks for a size before adding");
-await page.getByRole("button", { name: "L", exact: true }).click();
+await page.getByRole("button", { name: "Size L", exact: true }).click();
 await page.getByRole("button", { name: /Add to bag/ }).click();
 const drawer = page.getByRole("dialog", { name: "Your bag" });
 await drawer.waitFor({ state: "visible" });
@@ -30,7 +30,7 @@ await page.waitForLoadState("networkidle");
 const card = page.locator("article").first();
 await card.hover();
 await card.getByRole("button", { name: "Quick add" }).click();
-await card.getByRole("button", { name: "M", exact: true }).click();
+await card.getByRole("button", { name: "Size M", exact: true }).click();
 await drawer.waitFor({ state: "visible" });
 ok(await drawer.getByText("Size M").isVisible(), "quick add puts the ringer in the bag in size M");
 
@@ -64,16 +64,19 @@ await page.fill("#phone", "08030000000");
 await page.selectOption("#state", "Lagos");
 await page.getByLabel(/Nationwide delivery/).check();
 await page.screenshot({ path: `${shots}/e2e-checkout.png`, fullPage: true });
-await page.getByRole("button", { name: /Place test order/ }).click();
-await page.waitForURL("**/checkout/success");
-ok(await page.getByRole("heading", { name: "Order placed." }).isVisible(), "order confirmation shows");
-ok((await page.locator("header [data-bag-count]").textContent()) === "0", "bag is empty after ordering");
-await page.screenshot({ path: `${shots}/e2e-success.png` });
+// Run without Paystack keys: paying must fail safely with a WhatsApp fallback (full payment flow: e2e-payments.mjs).
+await page.getByRole("button", { name: /^Pay ₦/ }).click();
+const alert = page.getByRole("alert").filter({ hasText: "WhatsApp" });
+await alert.waitFor({ timeout: 10000 });
+ok((await alert.textContent()).includes("WhatsApp"), "without payment keys, Pay explains and offers WhatsApp instead");
+ok((await page.locator("header [data-bag-count]").textContent()) !== "0", "bag is kept when payment can't start");
+await page.screenshot({ path: `${shots}/e2e-checkout-nokeys.png` });
+await page.evaluate(() => localStorage.removeItem("maverick-bag"));
 
 // WhatsApp
 await page.goto(`${base}/products/peel-tee-white`);
 await page.waitForLoadState("networkidle");
-await page.getByRole("button", { name: "XL", exact: true }).click();
+await page.getByRole("button", { name: "Size XL", exact: true }).click();
 const wa = await page.getByRole("link", { name: /Order on WhatsApp/ }).getAttribute("href");
 ok(wa.startsWith("https://wa.me/2347025244302") && decodeURIComponent(wa).includes("size XL"), "Order on WhatsApp links to +234 702 524 4302 with the product and size");
 ok(await page.getByRole("link", { name: "Chat with MAVERICK on WhatsApp" }).isVisible(), "floating WhatsApp button is visible");

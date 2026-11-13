@@ -5,6 +5,7 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { WhatsAppFloat } from "@/components/whatsapp-float";
+import { Pixels } from "@/components/pixels";
 import "./globals.css";
 
 const archivo = Archivo({ variable: "--font-archivo", subsets: ["latin"] });
@@ -12,6 +13,7 @@ const anton = Anton({ variable: "--font-anton", subsets: ["latin"], weight: "400
 const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: { default: "MAVERICK — DIFFERENT BY CHOICE.", template: "%s — MAVERICK" },
   description: "MAVERICK menswear. Oversized graphic tees, ringers and long sleeves. DIFFERENT BY CHOICE.",
 };
@@ -27,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SiteFooter />
           <CartDrawer />
           <WhatsAppFloat />
+          <Pixels />
         </CartProvider>
       </body>
     </html>

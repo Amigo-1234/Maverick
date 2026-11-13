@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { tight, type Product } from "@/lib/catalog";
+import { inStock, tight, type Product } from "@/lib/catalog";
 import { formatPrice, site, whatsappLink } from "@/lib/site";
 import { BagIcon, ReturnIcon, TruckIcon, WhatsAppIcon } from "./icons";
 import { useCart } from "./cart/cart-context";
@@ -53,9 +53,12 @@ export function AddToBag({ product }: { product: Product }) {
           <Link href="/size-guide" className="text-[12px] uppercase tracking-[0.14em] text-muted-foreground underline underline-offset-4 hover:text-foreground">Size guide</Link>
         </div>
         <div className="grid grid-cols-5 gap-2">
-          {product.sizes.map((s) => (
-            <button key={s} type="button" aria-pressed={size === s} onClick={() => { setSize(s); setError(false); }} className={`cut-sm py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring ${size === s ? "bg-foreground text-background" : "bg-paper ring-1 ring-inset ring-foreground/20 hover:ring-foreground"}`}>{s}</button>
-          ))}
+          {product.sizes.map((s) => {
+            const available = inStock(product, s);
+            return (
+              <button key={s} type="button" disabled={!available} aria-pressed={size === s} aria-label={available ? `Size ${s}` : `Size ${s}, sold out`} onClick={() => { setSize(s); setError(false); }} className={`cut-sm py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:text-muted-foreground/60 disabled:line-through ${size === s ? "bg-foreground text-background" : "bg-paper ring-1 ring-inset ring-foreground/20 enabled:hover:ring-foreground"}`}>{s}</button>
+            );
+          })}
         </div>
         {error && <p role="alert" className="text-[13px] font-semibold text-accent-red">Choose a size first.</p>}
       </fieldset>

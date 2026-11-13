@@ -15,6 +15,13 @@ export const site = {
   returnsDays: 7, // PLACEHOLDER
   email: "hello@maverick.example", // PLACEHOLDER — replace with the real inbox
   announcement: "DROP 01 IS LIVE",
+  /** Business details shown on the legal pages. PLACEHOLDER — fill in before launch. */
+  legal: {
+    businessName: "MAVERICK", // registered business name
+    registration: "", // CAC registration number, e.g. "BN 1234567"
+    address: "Lagos, Nigeria", // business address for notices
+    updated: "13 November 2026",
+  },
   socials: {
     tiktok: { handle: "@maverickwear1", url: "https://www.tiktok.com/@maverickwear1" },
     snapchat: { handle: "maverick267153", url: "https://www.snapchat.com/add/maverick267153" },

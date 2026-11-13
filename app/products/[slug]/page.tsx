@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { CATEGORIES, getProduct, products, related } from "@/lib/catalog";
+import { CATEGORIES, getProduct, inStock, products, related } from "@/lib/catalog";
 import { formatPrice, site, sizeChart } from "@/lib/site";
 import { AddToBag, ProductGallery } from "@/components/product-purchase";
 import { ProductCard } from "@/components/product-card";
@@ -35,8 +35,26 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
   if (!p) notFound();
   const cat = CATEGORIES.find((c) => c.handle === p.category);
   const siblings = products.filter((x) => x.name === p.name && x.slug !== p.slug);
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: `${p.name} — ${p.colour}`,
+    sku: p.code,
+    brand: { "@type": "Brand", name: "MAVERICK" },
+    description: p.description,
+    image: p.photos.map((ph) => `${base}${ph.src}`),
+    offers: {
+      "@type": "Offer",
+      url: `${base}/products/${p.slug}`,
+      priceCurrency: "NGN",
+      price: p.price,
+      availability: p.sizes.some((sz) => inStock(p, sz)) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+  };
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <div className="mx-auto max-w-7xl gutter pb-20 pt-8">
         <nav aria-label="Breadcrumb" className="mb-6 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
           <Link href="/" className="hover:text-foreground">Home</Link> / <Link href={`/collections/${p.category}`} className="hover:text-foreground">{cat?.title}</Link> / <span className="text-foreground">{p.name}</span>
