@@ -9,11 +9,11 @@ import { ArrowRightIcon } from "@/components/icons";
 const railOrder = ["layered-long-sleeve", "strike-tee-black-blue", "peel-tee-white", "horned-m-ringer", "strike-tee-white-yellow", "lone-star-ringer"];
 const rail: RailGarment[] = railOrder.flatMap((slug) => {
   const p = getProduct(slug);
-  return p ? [{ id: p.slug, name: fullName(p), description: p.summary, image: p.front, backImage: p.back, tag: formatPrice(p.price), details: [p.code, ...p.details.slice(0, 3)] }] : [];
+  return p ? [{ id: p.slug, name: fullName(p), description: p.summary, image: p.front, backImage: p.back, sideImage: p.side, tag: formatPrice(p.price), details: [p.code, ...p.details.slice(0, 3)] }] : [];
 });
 
 /** Each lookbook photo paired with the product it shows, in marquee order. */
-const lookbook = ["reference_01", "reference_04", "reference_09", "reference_05", "reference_02", "reference_07", "reference_08", "reference_06", "reference_03"].flatMap((name) => {
+const lookbook = ["reference_01", "reference_04", "strike-black-side-front", "reference_09", "reference_05", "reference_02", "reference_07", "reference_08", "strike-white-side-front", "reference_06", "reference_03"].flatMap((name) => {
   for (const product of products) {
     const photo = product.photos.find((ph) => ph.src.includes(name));
     if (photo) return [{ ...photo, product }];

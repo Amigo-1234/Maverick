@@ -20,6 +20,8 @@ export interface Product {
   /** Transparent cut-outs on a 200x310 canvas (see scripts/cutouts.mjs). */
   front: string;
   back?: string;
+  /** Side-on cut-out shown while the piece rests on the rail (same canvas and scale as front/back). */
+  side?: string;
   /** The original studio photos, unedited. */
   photos: { src: string; alt: string }[];
   tag: string;
@@ -48,9 +50,12 @@ export const products: Product[] = [
     isNew: true,
     front: "/garments/strike-black-front.png",
     back: "/garments/strike-black-back.png",
+    side: "/garments/strike-black-side.png",
     photos: [
       { src: "/originals/reference_04.jpeg", alt: "Strike Tee in black, front" },
       { src: "/originals/reference_02.jpeg", alt: "Strike Tee in black, back" },
+      { src: "/originals/sides/strike-black-side-front.jpg", alt: "Strike Tee in black, side view from the front" },
+      { src: "/originals/sides/strike-black-side-back.jpg", alt: "Strike Tee in black, side view from the back" },
     ],
     tag: "TEE",
     summary: "Drip-lettered MAVERICK on the front, the slogan stacked across the back.",
@@ -117,9 +122,12 @@ export const products: Product[] = [
     isNew: true,
     front: "/garments/strike-white-front.png",
     back: "/garments/strike-white-back.png",
+    side: "/garments/strike-white-side.png",
     photos: [
       { src: "/originals/reference_08.jpeg", alt: "Strike Tee in white, front" },
       { src: "/originals/reference_03.jpeg", alt: "Strike Tee in white, back" },
+      { src: "/originals/sides/strike-white-side-front.jpg", alt: "Strike Tee in white, side view from the front" },
+      { src: "/originals/sides/strike-white-side-back.jpg", alt: "Strike Tee in white, side view from the back" },
     ],
     tag: "TEE",
     summary: "The Strike tee in white, with yellow drip lettering and a black outline.",
