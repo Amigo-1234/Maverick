@@ -1,46 +1,89 @@
 /**
- * Store settings. Values marked PLACEHOLDER are sensible defaults for a Nigerian streetwear store
- * and must be confirmed with the client before launch.
+ * Store settings types, defaults and formatting helpers (shared by client and server).
+ * The live values are edited in /admin → Settings and stored in the database.
  */
-export const site = {
-  name: "MAVERICK",
-  slogan: "DIFFERENT BY CHOICE.",
-  currency: "NGN",
-  locale: "en-NG",
-  freeShippingOver: 100000, // PLACEHOLDER (₦)
-  shipping: [
-    { id: "lagos", label: "Lagos delivery", eta: "1–2 working days", price: 3500 }, // PLACEHOLDER
-    { id: "nationwide", label: "Nationwide delivery", eta: "3–5 working days", price: 6000 }, // PLACEHOLDER
-  ],
-  returnsDays: 7, // PLACEHOLDER
-  email: "hello@maverick.example", // PLACEHOLDER — replace with the real inbox
-  announcement: "DROP 01 IS LIVE",
-  /** Business details shown on the legal pages. PLACEHOLDER — fill in before launch. */
-  legal: {
-    businessName: "MAVERICK", // registered business name
-    registration: "", // CAC registration number, e.g. "BN 1234567"
-    address: "Lagos, Nigeria", // business address for notices
-    updated: "13 November 2026",
-  },
-  socials: {
-    tiktok: { handle: "@maverickwear1", url: "https://www.tiktok.com/@maverickwear1" },
-    snapchat: { handle: "maverick267153", url: "https://www.snapchat.com/add/maverick267153" },
-    whatsapp: { display: "+234 702 524 4302", number: "2347025244302" },
-  },
+export type StoreSettings = {
+  name: string;
+  slogan: string;
+  email: string;
+  currency: string;
+  /** WhatsApp number in international format without "+", e.g. 2347025244302. */
+  whatsapp: string;
+  whatsappDisplay: string;
+  supportContact: string;
+  address: string;
+  socials: { tiktok: string; snapchat: string; instagram: string };
+  announcement: string;
+  maintenance: boolean;
+  freeDeliveryOver: number;
+  returnsDays: number;
+  deliveryInstructions: string;
+  legal: { businessName: string; registration: string; address: string; updated: string };
+  lowStockDefault: number;
 };
 
-/** wa.me link that opens a chat with MAVERICK, optionally with a message typed in. */
-export const whatsappLink = (text?: string) =>
-  `https://wa.me/${site.socials.whatsapp.number}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+/** Admin-only settings that never reach the browser. */
+export type PrivateSettings = StoreSettings & { orderNotifyEmail: string };
 
-const money = new Intl.NumberFormat(site.locale, { style: "currency", currency: site.currency, maximumFractionDigits: 0 });
+export type DeliveryZone = { id: number; name: string; states: string[]; fee: number; eta: string; isPickup: boolean; instructions: string };
+
+export const DEFAULT_SETTINGS: StoreSettings = {
+  name: "MAVERICK",
+  slogan: "DIFFERENT BY CHOICE.",
+  email: "hello@maverick.example",
+  currency: "NGN",
+  whatsapp: "2347025244302",
+  whatsappDisplay: "+234 702 524 4302",
+  supportContact: "+234 702 524 4302",
+  address: "Lagos, Nigeria",
+  socials: { tiktok: "https://www.tiktok.com/@maverickwear1", snapchat: "https://www.snapchat.com/add/maverick267153", instagram: "" },
+  announcement: "DROP 01 IS LIVE",
+  maintenance: false,
+  freeDeliveryOver: 100000,
+  returnsDays: 7,
+  deliveryInstructions: "",
+  legal: { businessName: "MAVERICK", registration: "", address: "Lagos, Nigeria", updated: "13 November 2026" },
+  lowStockDefault: 3,
+};
+
+/** wa.me link to the store's WhatsApp, optionally with a message typed in. */
+export const whatsappLink = (number: string, text?: string) =>
+  `https://wa.me/${number.replace(/\D/g, "")}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+
+/** "@handle" from a social profile URL, for display. */
+export const handleFrom = (url: string) => {
+  const m = url.match(/(?:tiktok\.com\/(@[^/?#]+)|snapchat\.com\/add\/([^/?#]+)|instagram\.com\/([^/?#]+))/i);
+  return m ? (m[1] ?? m[2] ?? (m[3] ? `@${m[3]}` : url)) : url;
+};
+
+const money = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 export const formatPrice = (n: number) => money.format(n);
+
+/** Normalises a Nigerian phone number to 234XXXXXXXXXX for matching and WhatsApp links. */
+export const normalisePhone = (p: string) => {
+  const d = p.replace(/\D/g, "");
+  if (d.startsWith("234")) return d;
+  if (d.startsWith("0")) return `234${d.slice(1)}`;
+  return d.length === 10 ? `234${d}` : d;
+};
 
 export const NIGERIAN_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu",
   "FCT – Abuja", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo",
   "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara",
 ];
+
+/** The delivery options for a state: zones naming the state first, then catch-all zones. Pickup is always listed if active. */
+export function zonesForState(zones: DeliveryZone[], state: string) {
+  const named = zones.filter((z) => !z.isPickup && z.states.includes(state));
+  const fallback = zones.filter((z) => !z.isPickup && z.states.length === 0);
+  const pickup = zones.filter((z) => z.isPickup);
+  return [...(named.length ? named : fallback), ...pickup];
+}
+
+/** Delivery fee after the free-delivery threshold (pickup is always free). */
+export const deliveryFee = (zone: DeliveryZone, merchandise: number, freeOver: number) =>
+  zone.isPickup || (freeOver > 0 && merchandise >= freeOver) ? 0 : zone.fee;
 
 /** PLACEHOLDER chart for an oversized, boxy tee. Replace with the manufacturer's measurements. */
 export const sizeChart = {
@@ -54,11 +97,3 @@ export const sizeChart = {
     ["XXL", "68", "77", "26"],
   ],
 };
-
-export const nav = [
-  { href: "/collections/new", label: "New In" },
-  { href: "/collections/tees", label: "Tees" },
-  { href: "/collections/ringers", label: "Ringers" },
-  { href: "/collections/long-sleeves", label: "Long Sleeves" },
-  { href: "/lookbook", label: "Lookbook" },
-];

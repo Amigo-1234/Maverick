@@ -1,13 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { products } from "@/lib/catalog";
+import { getStorefront } from "@/lib/server/store";
 import { PageHeader } from "@/components/page-header";
 import { ArrowRightIcon } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Lookbook", description: "MAVERICK Drop 01 lookbook." };
 
-export default function Lookbook() {
+export default async function Lookbook() {
+  const { products } = (await getStorefront()).catalog;
   const looks = products.flatMap((p) => p.photos.map((ph) => ({ ...ph, product: p })));
   return (
     <div className="mx-auto max-w-7xl gutter pb-24 pt-10">

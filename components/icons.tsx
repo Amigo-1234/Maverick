@@ -48,6 +48,14 @@ export function SnapchatIcon({ size = 20, ...rest }: P) {
   );
 }
 
+export function InstagramIcon({ size = 20, ...rest }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" focusable="false" {...rest}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" /><circle cx="12" cy="12" r="4" /><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 /** The client's horned M, traced from their logo artwork (scripts/trace-logo.mjs). */
 export function LogoMark({ size = 28, ...rest }: P) {
   return (

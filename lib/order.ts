@@ -1,16 +1,64 @@
 /**
- * Order pricing shared by the checkout page (for display) and the server (for charging).
- * The server always re-prices from the catalog, so a customer can't change what they pay.
+ * Order types, statuses and validation shared by the storefront, admin and server.
+ * Payment status and fulfilment status are deliberately separate:
+ *   payment    — set only from verified Paystack transactions (and refunds)
+ *   fulfilment — set by staff as the order is packed and delivered
  */
-import { getProduct, inStock } from "./catalog";
-import { NIGERIAN_STATES, site } from "./site";
+import { NIGERIAN_STATES } from "./site";
 
-export type CartLine = { slug: string; size: string; qty: number };
+export type CartLine = { slug: string; size: string; colour?: string; qty: number };
 
-export type PricedItem = {
-  slug: string; code: string; name: string; colour: string; size: string;
-  qty: number; unit: number; total: number;
+export type PaymentStatus = "pending" | "paid" | "failed" | "abandoned" | "refunded" | "partially_refunded";
+export type FulfilmentStatus = "unfulfilled" | "processing" | "preparing" | "shipped" | "delivered" | "cancelled" | "on_hold" | "refund_requested";
+
+export const PAYMENT_LABELS: Record<PaymentStatus, string> = {
+  pending: "Awaiting payment", paid: "Paid", failed: "Payment failed", abandoned: "Payment not completed",
+  refunded: "Refunded", partially_refunded: "Partly refunded",
 };
+export const FULFILMENT_LABELS: Record<FulfilmentStatus, string> = {
+  unfulfilled: "Not started", processing: "Processing", preparing: "Preparing for dispatch", shipped: "Shipped",
+  delivered: "Delivered", cancelled: "Cancelled", on_hold: "On hold", refund_requested: "Refund requested",
+};
+/** Statuses staff can move an order to. Shipping-type statuses need a paid order (checked on the server). */
+export const FULFILMENT_FLOW: FulfilmentStatus[] = ["processing", "preparing", "shipped", "delivered"];
+export const FULFILMENT_SIDE: FulfilmentStatus[] = ["on_hold", "refund_requested", "cancelled"];
+export const NEEDS_PAYMENT: FulfilmentStatus[] = ["processing", "preparing", "shipped", "delivered"];
+
+export type OrderItemView = { slug: string; code: string; name: string; colour: string; size: string; qty: number; unitPrice: number; total: number; image: string | null };
+export type OrderEventView = { kind: string; fromStatus: string | null; toStatus: string | null; note: string; createdAt: string; actor: string; visibleToCustomer: boolean };
+export type Address = { address1: string; address2?: string; city: string; state: string; postcode?: string; country: string };
+
+export type OrderView = {
+  id: string; number: string; createdAt: string; paidAt: string | null;
+  email: string; phone: string; firstName: string; lastName: string; address: Address;
+  deliveryLabel: string; deliveryEta: string;
+  subtotal: number; discountCode: string | null; discountAmount: number; deliveryFee: number; total: number;
+  paymentStatus: PaymentStatus; fulfilmentStatus: FulfilmentStatus; refundedAmount: number;
+  carrier: string; trackingRef: string; cancelReason: string; needsAttention: string; stockState: string;
+  paystackChannel: string | null; customerId: number | null;
+  items: OrderItemView[]; events: OrderEventView[];
+};
+
+export type TimelineStep = { key: string; label: string; state: "done" | "current" | "upcoming"; at: string | null };
+
+/**
+ * Customer timeline: Order placed → Payment confirmed → Processing → Preparing for dispatch → Shipped → Delivered.
+ * Side states (cancelled, on hold, refund requested, refunded) are shown as a banner alongside it.
+ */
+export function timeline(o: Pick<OrderView, "createdAt" | "paidAt" | "paymentStatus" | "fulfilmentStatus" | "events">): TimelineStep[] {
+  const paid = ["paid", "refunded", "partially_refunded"].includes(o.paymentStatus);
+  const reached = (s: FulfilmentStatus) => o.events.filter((e) => e.kind === "fulfilment" && e.toStatus === s).at(-1)?.createdAt ?? null;
+  const flowIndex = FULFILMENT_FLOW.indexOf(o.fulfilmentStatus);
+  // Furthest step reached on the main path, even if the order is now on hold.
+  const furthest = Math.max(flowIndex, ...FULFILMENT_FLOW.map((s, i) => (reached(s) ? i : -1)));
+  const steps: Omit<TimelineStep, "state">[] = [
+    { key: "placed", label: "Order placed", at: o.createdAt },
+    { key: "paid", label: "Payment confirmed", at: paid ? o.paidAt : null },
+    ...FULFILMENT_FLOW.map((s) => ({ key: s, label: FULFILMENT_LABELS[s], at: reached(s) })),
+  ];
+  const doneCount = paid ? 2 + Math.max(furthest + 1, 0) : 1;
+  return steps.map((s, i) => ({ ...s, state: i < doneCount - 1 ? "done" : i === doneCount - 1 ? "current" : "upcoming" }));
+}
 
 export type Customer = {
   email: string; firstName: string; lastName: string; phone: string;
@@ -18,47 +66,8 @@ export type Customer = {
   marketing?: boolean;
 };
 
-/** What we store on the Paystack transaction as metadata, and read back on the admin page. */
-export type OrderRecord = {
-  orderId: string;
-  customer: Customer;
-  shipping: { id: string; label: string; eta: string; price: number };
-  items: PricedItem[];
-  subtotal: number;
-  delivery: number;
-  total: number;
-  currency: "NGN";
-};
-
-export function deliveryFor(subtotal: number, shippingId: string) {
-  const option = site.shipping.find((s) => s.id === shippingId);
-  if (!option) return null;
-  return { ...option, price: subtotal >= site.freeShippingOver ? 0 : option.price };
-}
-
-/** Prices a cart from the catalog. Returns errors for anything that can't be bought. */
-export function priceCart(lines: CartLine[], shippingId: string) {
-  const errors: string[] = [];
-  const items: PricedItem[] = [];
-  if (!Array.isArray(lines) || lines.length === 0) errors.push("Your bag is empty.");
-  if (Array.isArray(lines) && lines.length > 30) errors.push("Too many items in one order.");
-  for (const line of Array.isArray(lines) ? lines.slice(0, 30) : []) {
-    const p = getProduct(String(line?.slug));
-    const qty = Number(line?.qty);
-    const size = String(line?.size);
-    if (!p) { errors.push("A piece in your bag is no longer available."); continue; }
-    if (!Number.isInteger(qty) || qty < 1 || qty > 10) { errors.push(`Check the quantity for ${p.name}.`); continue; }
-    if (!inStock(p, size)) { errors.push(`${p.name} (${p.colour}) in size ${size} is sold out.`); continue; }
-    items.push({ slug: p.slug, code: p.code, name: p.name, colour: p.colour, size, qty, unit: p.price, total: p.price * qty });
-  }
-  const subtotal = items.reduce((n, i) => n + i.total, 0);
-  const shipping = deliveryFor(subtotal, shippingId);
-  if (!shipping) errors.push("Choose a delivery method.");
-  const delivery = shipping?.price ?? 0;
-  return { items, subtotal, delivery, total: subtotal + delivery, shipping, errors };
-}
-
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+export const validEmail = (e: string) => EMAIL.test(e);
 
 /** Validates and normalises the checkout form. */
 export function readCustomer(input: Record<string, unknown>): { customer?: Customer; errors: string[] } {
@@ -77,11 +86,11 @@ export function readCustomer(input: Record<string, unknown>): { customer?: Custo
     marketing: input.marketing === true || input.marketing === "on",
   };
   const errors: string[] = [];
-  if (!EMAIL.test(c.email)) errors.push("Enter a valid email address.");
+  if (!validEmail(c.email)) errors.push("Enter a valid email address.");
   if (!c.firstName || !c.lastName) errors.push("Enter your first and last name.");
   if (c.phone.replace(/\D/g, "").length < 10) errors.push("Enter a phone number the rider can call.");
   if (!c.address1 || !c.city) errors.push("Enter your delivery address and city.");
-  if (c.country === "Nigeria" && !NIGERIAN_STATES.includes(c.state)) errors.push("Choose your state.");
+  if (!NIGERIAN_STATES.includes(c.state)) errors.push("Choose your state.");
   return errors.length ? { errors } : { customer: c, errors };
 }
 

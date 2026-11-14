@@ -3,42 +3,35 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRightIcon, SnapchatIcon, TikTokIcon, WhatsAppIcon } from "./icons";
-import { site, whatsappLink } from "@/lib/site";
+import { ArrowRightIcon, InstagramIcon, SnapchatIcon, TikTokIcon, WhatsAppIcon } from "./icons";
+import { handleFrom } from "@/lib/site";
+import { useCatalog, useSettings, useWhatsApp } from "./store-provider";
 
-const columns = [
-  { title: "Shop", links: [["Shop All", "/collections/all"], ["New In", "/collections/new"], ["Tees", "/collections/tees"], ["Ringers", "/collections/ringers"], ["Long Sleeves", "/collections/long-sleeves"]] },
-  { title: "Help", links: [["Size Guide", "/size-guide"], ["Shipping & Returns", "/shipping-returns"], ["FAQ", "/faq"], ["Contact", "/contact"], ["Terms of Sale", "/terms"], ["Privacy Policy", "/privacy"]] },
-  { title: "Maverick", links: [["About", "/about"], ["Lookbook", "/lookbook"]] },
-];
+const helpLinks = [["Track your order", "/track-order"], ["Size Guide", "/size-guide"], ["Shipping & Returns", "/shipping-returns"], ["FAQ", "/faq"], ["Contact", "/contact"], ["Terms of Sale", "/terms"], ["Privacy Policy", "/privacy"]];
 
 export function Socials({ className = "" }: { className?: string }) {
+  const s = useSettings();
+  const wa = useWhatsApp();
   const item = "flex items-center gap-3 border border-current/25 px-4 py-3 transition-colors hover:border-current hover:text-accent-blue focus-visible:outline-2 focus-visible:outline-ring";
+  const label = (kind: string, value: string) => <span className="flex flex-col leading-tight"><span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-60">{kind}</span><span className="text-sm font-semibold">{value}</span></span>;
   return (
     <ul className={`flex flex-wrap gap-2 ${className}`}>
-      <li>
-        <a href={site.socials.tiktok.url} target="_blank" rel="noopener noreferrer" className={item}>
-          <TikTokIcon size={20} />
-          <span className="flex flex-col leading-tight"><span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-60">TikTok</span><span className="text-sm font-semibold">{site.socials.tiktok.handle}</span></span>
-        </a>
-      </li>
-      <li>
-        <a href={site.socials.snapchat.url} target="_blank" rel="noopener noreferrer" className={item}>
-          <SnapchatIcon size={20} />
-          <span className="flex flex-col leading-tight"><span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-60">Snapchat</span><span className="text-sm font-semibold">{site.socials.snapchat.handle}</span></span>
-        </a>
-      </li>
-      <li>
-        <a href={whatsappLink("Hi MAVERICK!")} target="_blank" rel="noopener noreferrer" className={item}>
-          <WhatsAppIcon size={20} />
-          <span className="flex flex-col leading-tight"><span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-60">WhatsApp</span><span className="text-sm font-semibold tabular-nums">{site.socials.whatsapp.display}</span></span>
-        </a>
-      </li>
+      {s.socials.tiktok && <li><a href={s.socials.tiktok} target="_blank" rel="noopener noreferrer" className={item}><TikTokIcon size={20} />{label("TikTok", handleFrom(s.socials.tiktok))}</a></li>}
+      {s.socials.snapchat && <li><a href={s.socials.snapchat} target="_blank" rel="noopener noreferrer" className={item}><SnapchatIcon size={20} />{label("Snapchat", handleFrom(s.socials.snapchat))}</a></li>}
+      {s.socials.instagram && <li><a href={s.socials.instagram} target="_blank" rel="noopener noreferrer" className={item}><InstagramIcon size={20} />{label("Instagram", handleFrom(s.socials.instagram))}</a></li>}
+      {s.whatsapp && <li><a href={wa(`Hi ${s.name}!`)} target="_blank" rel="noopener noreferrer" className={item}><WhatsAppIcon size={20} />{label("WhatsApp", s.whatsappDisplay)}</a></li>}
     </ul>
   );
 }
 
 export function SiteFooter() {
+  const settings = useSettings();
+  const catalog = useCatalog();
+  const columns = [
+    { title: "Shop", links: catalog.collections.filter((c) => c.slugs.length).slice(0, 7).map((c) => [c.title, `/collections/${c.handle}`]) },
+    { title: "Help", links: helpLinks },
+    { title: settings.name, links: [["About", "/about"], ["Lookbook", "/lookbook"]] },
+  ];
   const [done, setDone] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -96,8 +89,8 @@ export function SiteFooter() {
             <p className="font-display text-[clamp(3.5rem,14vw,11rem)] uppercase leading-[0.8] tracking-tight">Maverick</p>
           </div>
           <div className="flex flex-col items-end gap-1 pb-20 font-mono text-[11px] uppercase tracking-[0.2em] text-paper/60">
-            <span>{site.slogan}</span>
-            <span>© 2026 Maverick</span>
+            <span>{settings.slogan}</span>
+            <span>© 2026 {settings.legal.businessName}</span>
           </div>
         </div>
       </div>

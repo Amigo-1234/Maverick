@@ -1,19 +1,22 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { CATEGORIES, getProduct, inStock, products, related } from "@/lib/catalog";
-import { formatPrice, site, sizeChart } from "@/lib/site";
+import { anyInStock, findProduct, related } from "@/lib/catalog";
+import { formatPrice, sizeChart } from "@/lib/site";
+import { getStorefront } from "@/lib/server/store";
 import { AddToBag, ProductGallery } from "@/components/product-purchase";
-import { ProductCard } from "@/components/product-card";
+import { Price, ProductCard } from "@/components/product-card";
 import { PlusIcon } from "@/components/icons";
 
-export function generateStaticParams() {
-  return products.map((p) => ({ slug: p.slug }));
+export async function generateStaticParams() {
+  const { catalog } = await getStorefront();
+  return catalog.products.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata(props: PageProps<"/products/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
-  const p = getProduct(slug);
+  const p = findProduct((await getStorefront()).catalog, slug);
   return p ? { title: `${p.name} — ${p.colour}`, description: p.summary, openGraph: { images: [p.photos[0]?.src ?? p.front] } } : {};
 }
 
@@ -29,19 +32,27 @@ function Section({ title, children, open = false }: { title: string; children: R
   );
 }
 
-export default async function ProductPage(props: PageProps<"/products/[slug]">) {
-  const { slug } = await props.params;
-  const p = getProduct(slug);
+export default function ProductPage(props: PageProps<"/products/[slug]">) {
+  return (
+    <Suspense fallback={<div className="mx-auto min-h-[70vh] max-w-7xl gutter pt-8" aria-busy="true"><p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Loading…</p></div>}>
+      <Product params={props.params} />
+    </Suspense>
+  );
+}
+
+async function Product({ params }: { params: PageProps<"/products/[slug]">["params"] }) {
+  const { slug } = await params;
+  const { catalog, settings, zones } = await getStorefront();
+  const p = findProduct(catalog, slug);
   if (!p) notFound();
-  const cat = CATEGORIES.find((c) => c.handle === p.category);
-  const siblings = products.filter((x) => x.name === p.name && x.slug !== p.slug);
+  const siblings = catalog.products.filter((x) => x.name === p.name && x.slug !== p.slug);
   const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: `${p.name} — ${p.colour}`,
     sku: p.code,
-    brand: { "@type": "Brand", name: "MAVERICK" },
+    brand: { "@type": "Brand", name: settings.name },
     description: p.description,
     image: p.photos.map((ph) => `${base}${ph.src}`),
     offers: {
@@ -49,7 +60,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
       url: `${base}/products/${p.slug}`,
       priceCurrency: "NGN",
       price: p.price,
-      availability: p.sizes.some((sz) => inStock(p, sz)) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      availability: anyInStock(p) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     },
   };
   return (
@@ -57,7 +68,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <div className="mx-auto max-w-7xl gutter pb-20 pt-8">
         <nav aria-label="Breadcrumb" className="mb-6 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-          <Link href="/" className="hover:text-foreground">Home</Link> / <Link href={`/collections/${p.category}`} className="hover:text-foreground">{cat?.title}</Link> / <span className="text-foreground">{p.name}</span>
+          <Link href="/" className="hover:text-foreground">Home</Link> / {p.category && <><Link href={`/collections/${p.category}`} className="hover:text-foreground">{p.categoryTitle}</Link> / </>}<span className="text-foreground">{p.name}</span>
         </nav>
         <div className="grid gap-10 lg:grid-cols-[1.25fr_1fr] lg:gap-14">
           <ProductGallery product={p} />
@@ -68,7 +79,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
               </div>
               <h1 className="font-display text-[clamp(2.8rem,6vw,4.5rem)] uppercase leading-[0.88]">{p.name}</h1>
               <p className="text-[15px]">{p.colour}</p>
-              <p className="price text-xl tabular-nums">{formatPrice(p.price)}</p>
+              <Price product={p} className="!justify-start text-xl" />
             </div>
             {siblings.length > 0 && (
               <div className="flex flex-col gap-2">
@@ -86,6 +97,13 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
               <Section title="Details">
                 <ul className="flex flex-col gap-1.5">{p.details.map((d) => <li key={d} className="flex gap-2"><span aria-hidden="true">—</span>{d}</li>)}</ul>
               </Section>
+              {(p.materials || p.care) && (
+                <Section title="Materials & care">
+                  {p.materials && <p><span className="font-semibold text-foreground">Materials:</span> {p.materials}</p>}
+                  {p.care && <p className="mt-2 whitespace-pre-line"><span className="font-semibold text-foreground">Care:</span> {p.care}</p>}
+                </Section>
+              )}
+              {p.extraInfo && <Section title="More information"><p className="whitespace-pre-line">{p.extraInfo}</p></Section>}
               <Section title="Size & fit">
                 <p className="mb-3">Cut oversized and boxy. Take your usual size for the intended look, or size down for a closer fit.</p>
                 <div className="overflow-x-auto">
@@ -97,7 +115,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
                 <Link href="/size-guide" className="mt-3 inline-block underline underline-offset-4 hover:text-foreground">Full size guide</Link>
               </Section>
               <Section title="Delivery & returns">
-                <p>Free delivery on orders over {formatPrice(site.freeShippingOver)}. {site.shipping.map((s) => `${s.label}: ${s.eta.toLowerCase()}`).join(". ")}. Returns accepted within {site.returnsDays} days on unworn pieces.</p>
+                <p>{settings.freeDeliveryOver > 0 && <>Free delivery on orders over {formatPrice(settings.freeDeliveryOver)}. </>}{zones.map((z) => `${z.name}: ${z.eta.toLowerCase()}`).join(". ")}. Returns accepted within {settings.returnsDays} days on unworn pieces.</p>
                 <Link href="/shipping-returns" className="mt-3 inline-block underline underline-offset-4 hover:text-foreground">Shipping & returns</Link>
               </Section>
             </div>
@@ -108,7 +126,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
         <div className="mx-auto max-w-7xl gutter py-16">
           <h2 id="rel-h" className="mb-6 font-display text-5xl uppercase leading-none">Complete the look</h2>
           <ul className="grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">
-            {related(p).map((r) => <li key={r.slug}><ProductCard product={r} /></li>)}
+            {related(catalog, p).map((r) => <li key={r.slug}><ProductCard product={r} /></li>)}
           </ul>
         </div>
       </section>

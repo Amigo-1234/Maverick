@@ -2,27 +2,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { ClothingRailHero, type RailGarment } from "@/components/clothing-rail-hero";
 import { ProductCard } from "@/components/product-card";
-import { CATEGORIES, fullName, getProduct, products, tight } from "@/lib/catalog";
+import { fullName, type Product } from "@/lib/catalog";
+import { getStorefront } from "@/lib/server/store";
 import { formatPrice } from "@/lib/site";
 import { ArrowRightIcon } from "@/components/icons";
 
-const railOrder = ["layered-long-sleeve", "strike-tee-black-blue", "peel-tee-white", "horned-m-ringer", "strike-tee-white-yellow", "lone-star-ringer"];
-const rail: RailGarment[] = railOrder.flatMap((slug) => {
-  const p = getProduct(slug);
-  return p ? [{ id: p.slug, name: fullName(p), description: p.summary, image: p.front, backImage: p.back, sideImage: p.side, tag: formatPrice(p.price), details: [p.code, ...p.details.slice(0, 3)] }] : [];
-});
-
-/** Each lookbook photo paired with the product it shows, in marquee order. */
-const lookbook = ["reference_01", "reference_04", "strike-black-side-front", "reference_09", "reference_05", "reference_02", "reference_07", "reference_08", "strike-white-side-front", "reference_06", "reference_03"].flatMap((name) => {
-  for (const product of products) {
-    const photo = product.photos.find((ph) => ph.src.includes(name));
-    if (photo) return [{ ...photo, product }];
-  }
-  return [];
-});
-
-export default function Home() {
-  const spotlight = getProduct("strike-tee-black-blue")!;
+export default async function Home() {
+  const { catalog } = await getStorefront();
+  const { products } = catalog;
+  // The rail shows up to 8 published pieces in the admin's sort order.
+  const rail: RailGarment[] = products.slice(0, 8).map((p) => ({ id: p.slug, name: fullName(p), description: p.summary, image: p.front, backImage: p.back, sideImage: p.side, tag: formatPrice(p.price), details: [p.code, ...p.details.slice(0, 3)] }));
+  // Lookbook marquee: every studio photo, alternating between products.
+  const lookbook: { src: string; alt: string; product: Product }[] = [];
+  for (let k = 0; k < 6; k++) for (const p of products) { const ph = p.photos[k]; if (ph) lookbook.push({ ...ph, product: p }); }
+  const spotlight = products.find((p) => p.featured && p.backTight) ?? products.find((p) => p.backTight) ?? products[0];
+  const twin = spotlight ? products.find((p) => p.name === spotlight.name && p.slug !== spotlight.slug) : undefined;
+  const categories = catalog.categories.map((c) => ({ ...c, pieces: products.filter((p) => p.category === c.handle) })).filter((c) => c.pieces.length);
   return (
     <>
       <ClothingRailHero
@@ -48,8 +43,8 @@ export default function Home() {
           <Link href="/collections/all" className="text-[12px] font-semibold uppercase tracking-[0.16em] underline underline-offset-4 hover:text-accent-blue">Shop all</Link>
         </div>
         <ul className="grid gap-4 md:grid-cols-3">
-          {CATEGORIES.map((c, i) => {
-            const pieces = products.filter((p) => p.category === c.handle);
+          {categories.slice(0, 3).map((c, i) => {
+            const pieces = c.pieces;
             const hero = pieces[0];
             return (
               <li key={c.handle}>
@@ -58,7 +53,7 @@ export default function Home() {
                     <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-paper/60">0{i + 1} / {pieces.length} {pieces.length === 1 ? "piece" : "pieces"}</span>
                     <ArrowRightIcon size={22} className="transition-transform group-hover:translate-x-1" />
                   </div>
-                  {hero && <Image src={tight(hero.front)} alt="" fill sizes="(min-width: 768px) 33vw, 100vw" className="object-contain p-[12%] pt-[16%] transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none" />}
+                  {hero && <Image src={hero.frontTight} alt="" fill sizes="(min-width: 768px) 33vw, 100vw" className="object-contain p-[12%] pt-[16%] transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none" />}
                   <div className="relative z-10">
                     <p className="font-display text-6xl uppercase leading-[0.85]">{c.title}</p>
                     <p className="mt-2 max-w-[30ch] text-sm text-paper/70">{c.blurb}</p>
@@ -82,27 +77,27 @@ export default function Home() {
       </section>
 
       {/* Spotlight: front and back */}
-      <section className="bg-ink text-paper" aria-labelledby="spot-h">
+      {spotlight && <section className="bg-ink text-paper" aria-labelledby="spot-h">
         <div className="mx-auto grid max-w-7xl items-center gap-10 gutter py-20 lg:grid-cols-[1.4fr_1fr]">
           <div className="grid grid-cols-2 gap-3">
-            {[spotlight.front, spotlight.back!].map((src, k) => (
+            {[spotlight.frontTight, spotlight.backTight].filter((x): x is string => Boolean(x)).map((src, k) => (
               <div key={src} className="cut relative bg-[#1a1a1c]" style={{ aspectRatio: "4 / 5" }}>
-                <Image src={tight(src)} alt={`${spotlight.name}, ${k ? "back" : "front"}`} fill sizes="(min-width: 1024px) 30vw, 50vw" className="object-contain p-[7%]" />
+                <Image src={src} alt={`${spotlight.name}, ${k ? "back" : "front"}`} fill sizes="(min-width: 1024px) 30vw, 50vw" className="object-contain p-[7%]" />
                 <span className="absolute left-3 top-3 font-mono text-[10px] uppercase tracking-[0.2em] text-paper/60">{k ? "Back" : "Front"}</span>
               </div>
             ))}
           </div>
           <div className="flex flex-col gap-5">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent-blue">{spotlight.code} / Spotlight</p>
-            <h2 id="spot-h" className="font-display text-6xl uppercase leading-[0.88] md:text-7xl">Strike Tee</h2>
+            <h2 id="spot-h" className="font-display text-6xl uppercase leading-[0.88] md:text-7xl">{spotlight.name}</h2>
             <p className="max-w-[46ch] text-paper/75">{spotlight.description}</p>
             <div className="flex flex-wrap items-center gap-4">
-              <Link href={`/products/${spotlight.slug}`} className="btn-light">Shop the Strike Tee — {formatPrice(spotlight.price)}</Link>
-              <Link href="/products/strike-tee-white-yellow" className="text-[12px] font-semibold uppercase tracking-[0.16em] underline underline-offset-4 hover:text-accent-blue">Also in white / yellow</Link>
+              <Link href={`/products/${spotlight.slug}`} className="btn-light">Shop the {spotlight.name} — {formatPrice(spotlight.price)}</Link>
+              {twin && <Link href={`/products/${twin.slug}`} className="text-[12px] font-semibold uppercase tracking-[0.16em] underline underline-offset-4 hover:text-accent-blue">Also in {twin.colour.toLowerCase()}</Link>}
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* Manifesto */}
       <section className="mx-auto max-w-7xl gutter py-20" aria-labelledby="mf-h">

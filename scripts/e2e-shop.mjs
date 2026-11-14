@@ -1,7 +1,7 @@
 // End-to-end shopping test in the installed Google Chrome. Usage: node scripts/e2e-shop.mjs [baseUrl]
 import { chromium } from "playwright-core";
 const base = process.argv[2] ?? "http://localhost:3123";
-const shots = process.env.SHOTS ?? ".";
+const shots = process.env.SHOTS ?? (await import("node:fs")).mkdtempSync((await import("node:path")).join((await import("node:os")).tmpdir(), "mv-shots-"));
 const browser = await chromium.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
@@ -36,11 +36,12 @@ ok(await drawer.getByText("Size M").isVisible(), "quick add puts the ringer in t
 
 // bag persists across reloads
 await page.reload();
+await page.waitForFunction(() => document.querySelector("header [data-bag-count]")?.textContent === "3", null, { timeout: 10000 }).catch(() => {});
 ok((await page.locator("header [data-bag-count]").textContent()) === "3", "bag count persists after reload (3 items)");
 
 // sort + filter
 await page.goto(`${base}/collections/all?sort=price-asc`);
-const firstPrice = await page.locator("article").first().locator("p.price").last().textContent();
+const firstPrice = await page.locator("article").first().locator("span.price").last().textContent();
 ok(firstPrice === "₦25,000", `sort price low-high puts ₦25,000 first (got ${firstPrice})`);
 await page.waitForLoadState("networkidle");
 await page.getByRole("button", { name: "White", exact: true }).click();
@@ -62,7 +63,7 @@ await page.fill("#address1", "1 Test Street");
 await page.fill("#city", "London");
 await page.fill("#phone", "08030000000");
 await page.selectOption("#state", "Lagos");
-await page.getByLabel(/Nationwide delivery/).check();
+await page.getByLabel(/Lagos delivery/).check();
 await page.screenshot({ path: `${shots}/e2e-checkout.png`, fullPage: true });
 // Run without Paystack keys: paying must fail safely with a WhatsApp fallback (full payment flow: e2e-payments.mjs).
 await page.getByRole("button", { name: /^Pay ₦/ }).click();

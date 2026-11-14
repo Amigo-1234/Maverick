@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { whatsappLink } from "@/lib/site";
+import { useWhatsApp } from "@/components/store-provider";
 
 export function ContactForm() {
+  const wa = useWhatsApp();
   const [state, setState] = React.useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = React.useState<string | null>(null);
   if (state === "sent") return <p role="status" className="font-display text-4xl uppercase">Message received. We&apos;ll be in touch.</p>;
@@ -32,7 +33,7 @@ export function ContactForm() {
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 overflow-hidden"><label htmlFor="c-company">Company</label><input id="c-company" name="company" tabIndex={-1} autoComplete="off" /></div>
       {error && (
         <p role="alert" className="border-l-4 border-accent-red bg-paper px-4 py-3 text-sm sm:col-span-2">
-          {error} <a className="underline underline-offset-4" href={whatsappLink("Hi MAVERICK!")} target="_blank" rel="noopener noreferrer">Open WhatsApp</a>
+          {error} <a className="underline underline-offset-4" href={wa("Hi!")} target="_blank" rel="noopener noreferrer">Open WhatsApp</a>
         </p>
       )}
       <button type="submit" disabled={state === "sending"} className="btn sm:col-span-2 sm:justify-self-start disabled:opacity-60">{state === "sending" ? "Sending…" : "Send message"}</button>

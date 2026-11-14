@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { products as all, type Product } from "@/lib/catalog";
+import type { Product } from "@/lib/catalog";
+import { useCatalog } from "./store-provider";
 import { ProductCard } from "./product-card";
 
 const SORTS = [
@@ -16,9 +17,10 @@ const baseColour = (p: Product) => p.colour.split(" / ")[0] ?? p.colour;
 
 export function CollectionGrid({ slugs }: { slugs: string[] }) {
   const params = useSearchParams();
+  const { products: all } = useCatalog();
   const sort = params.get("sort") ?? "featured";
   const colour = params.get("colour") ?? "";
-  const items = React.useMemo(() => all.filter((p) => slugs.includes(p.slug)), [slugs]);
+  const items = React.useMemo(() => slugs.map((s) => all.find((p) => p.slug === s)).filter((p): p is Product => Boolean(p)), [slugs, all]);
   const colours = [...new Set(items.map(baseColour))];
 
   const set = (key: string, value: string) => {
@@ -63,6 +65,7 @@ export function CollectionGrid({ slugs }: { slugs: string[] }) {
 }
 
 export function CollectionGridFallback({ slugs }: { slugs: string[] }) {
+  const { products: all } = useCatalog();
   const items = all.filter((p) => slugs.includes(p.slug));
   return (
     <ul className="mt-[66px] grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">

@@ -2,25 +2,36 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { COLLECTIONS, products } from "@/lib/catalog";
+import { collectionBy } from "@/lib/catalog";
+import { getStorefront } from "@/lib/server/store";
 import { CollectionGrid, CollectionGridFallback } from "@/components/collection-grid";
 
-export function generateStaticParams() {
-  return Object.keys(COLLECTIONS).map((handle) => ({ handle }));
+export async function generateStaticParams() {
+  const { catalog } = await getStorefront();
+  return catalog.collections.map((c) => ({ handle: c.handle }));
 }
 
 export async function generateMetadata(props: PageProps<"/collections/[handle]">): Promise<Metadata> {
   const { handle } = await props.params;
-  const c = COLLECTIONS[handle];
+  const c = collectionBy((await getStorefront()).catalog, handle);
   return c ? { title: c.title, description: c.blurb } : {};
 }
 
-export default async function CollectionPage(props: PageProps<"/collections/[handle]">) {
-  const { handle } = await props.params;
-  const c = COLLECTIONS[handle];
+export default function CollectionPage(props: PageProps<"/collections/[handle]">) {
+  return (
+    <Suspense fallback={<div className="mx-auto min-h-[70vh] max-w-7xl gutter pt-10" aria-busy="true" />}>
+      <Collection params={props.params} />
+    </Suspense>
+  );
+}
+
+async function Collection({ params }: { params: PageProps<"/collections/[handle]">["params"] }) {
+  const { handle } = await params;
+  const { catalog } = await getStorefront();
+  const c = collectionBy(catalog, handle);
   if (!c) notFound();
-  const slugs = products.filter(c.filter).map((p) => p.slug);
-  const tabs = Object.entries(COLLECTIONS);
+  const slugs = c.slugs;
+  const tabs = catalog.collections.filter((t) => t.slugs.length || t.handle === handle).map((t) => [t.handle, t] as const);
   return (
     <div className="mx-auto max-w-7xl gutter pb-24 pt-10">
       <nav aria-label="Breadcrumb" className="mb-6 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">

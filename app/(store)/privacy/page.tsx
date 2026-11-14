@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
-import { site } from "@/lib/site";
+import { getStorefront } from "@/lib/server/store";
 
 export const metadata: Metadata = { title: "Privacy Policy" };
 
-export default function Privacy() {
-  const L = site.legal;
+export default async function Privacy() {
+  const { settings, zones } = await getStorefront();
+  void zones;
+  const L = settings.legal;
   return (
     <div className="mx-auto max-w-7xl gutter pb-24 pt-10">
       <PageHeader title="Privacy Policy" intro={`Last updated ${L.updated}. How ${L.businessName} collects and uses your personal data, in line with the Nigeria Data Protection Act 2023.`} />
       <div className="prose-mv">
         <h2 className="!mt-0">Who is responsible</h2>
-        <p>{L.businessName}{L.registration ? ` (registration ${L.registration})` : ""}, {L.address}, is the data controller for this website. For any privacy question or request, email {site.email} or WhatsApp {site.socials.whatsapp.display}.</p>
+        <p>{L.businessName}{L.registration ? ` (registration ${L.registration})` : ""}, {L.address}, is the data controller for this website. For any privacy question or request, email {settings.email} or WhatsApp {settings.whatsappDisplay}.</p>
 
         <h2>What we collect and why</h2>
         <ul className="flex list-disc flex-col gap-2 pl-5">

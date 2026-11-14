@@ -1,7 +1,6 @@
 /** Paystack API client (server only). Docs: https://paystack.com/docs/api/ */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "./config";
-import type { OrderRecord } from "../order";
 
 export type PaystackTransaction = {
   id: number;
@@ -31,8 +30,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return body.data as T;
 }
 
-export function initializeTransaction(args: { email: string; amountKobo: number; reference: string; callbackUrl: string; order: OrderRecord }) {
-  const { order } = args;
+export function initializeTransaction(args: { email: string; amountKobo: number; reference: string; callbackUrl: string; cancelUrl: string; summary: { customer: string; phone: string; items: string; delivery: string } }) {
   return call<{ authorization_url: string; access_code: string; reference: string }>("/transaction/initialize", {
     method: "POST",
     body: JSON.stringify({
@@ -43,19 +41,23 @@ export function initializeTransaction(args: { email: string; amountKobo: number;
       callback_url: args.callbackUrl,
       channels: ["card", "bank", "ussd", "bank_transfer"],
       metadata: {
-        order,
-        cancel_action: `${config.siteUrl}/checkout?cancelled=1`,
-        // Shown on the transaction in the Paystack dashboard.
+        order_number: args.reference,
+        cancel_action: args.cancelUrl,
+        // Shown on the transaction in the Paystack dashboard. The order itself lives in our database.
         custom_fields: [
-          { display_name: "Customer", variable_name: "customer", value: `${order.customer.firstName} ${order.customer.lastName}` },
-          { display_name: "Phone", variable_name: "phone", value: order.customer.phone },
-          { display_name: "Items", variable_name: "items", value: order.items.map((i) => `${i.qty}× ${i.name} (${i.colour}, ${i.size})`).join("; ") },
-          { display_name: "Delivery", variable_name: "delivery", value: `${order.shipping.label}: ${[order.customer.address1, order.customer.address2, order.customer.city, order.customer.state].filter(Boolean).join(", ")}` },
+          { display_name: "Customer", variable_name: "customer", value: args.summary.customer },
+          { display_name: "Phone", variable_name: "phone", value: args.summary.phone },
+          { display_name: "Items", variable_name: "items", value: args.summary.items },
+          { display_name: "Delivery", variable_name: "delivery", value: args.summary.delivery },
         ],
       },
     }),
   });
 }
+
+/** Refunds a transaction (full when amountKobo is omitted). */
+export const refundTransaction = (reference: string, amountKobo?: number, note?: string) =>
+  call<{ status: string }>("/refund", { method: "POST", body: JSON.stringify({ transaction: reference, ...(amountKobo ? { amount: amountKobo } : {}), ...(note ? { merchant_note: note } : {}) }) });
 
 export const verifyTransaction = (reference: string) =>
   call<PaystackTransaction>(`/transaction/verify/${encodeURIComponent(reference)}`);
@@ -74,17 +76,5 @@ export function isValidSignature(rawBody: string, signature: string | null) {
   const a = Buffer.from(expected), b = Buffer.from(signature);
   return a.length === b.length && timingSafeEqual(a, b);
 }
-
-/** Reads our order back off a transaction and checks the amount matches what we priced. */
-export function orderFrom(tx: PaystackTransaction): OrderRecord | null {
-  let meta = tx.metadata as { order?: OrderRecord } | string | null | undefined;
-  if (typeof meta === "string") { try { meta = JSON.parse(meta); } catch { meta = null; } }
-  const order = (meta as { order?: OrderRecord } | null)?.order;
-  if (!order || typeof order.total !== "number") return null;
-  return order;
-}
-
-export const amountMatches = (tx: PaystackTransaction, order: OrderRecord) =>
-  tx.currency === "NGN" && tx.amount === Math.round(order.total * 100);
 
 export { PaystackError };

@@ -177,3 +177,17 @@ h1, h2, h3 { text-wrap: balance; }
 .site-header.z-\[57\] { background: var(--ink); color: var(--paper); border-color: transparent; }
 .site-header.z-\[57\] .nav-close-btn { background: var(--paper); color: var(--ink); }
 .site-header.z-\[57\] [data-bag-count] { background: var(--paper); color: var(--ink); }
+
+/* ───────────── Admin tables & forms ───────────── */
+.atable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.atable th { text-align: left; font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .16em; color: var(--muted-foreground); padding: .6rem .75rem; border-bottom: 2px solid var(--ink); white-space: nowrap; }
+.atable td { padding: .75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.atable tbody tr:hover { background: color-mix(in oklab, var(--paper) 70%, transparent); }
+.atable .num { text-align: right; font-variant-numeric: tabular-nums; }
+.atable a.rowlink { font-weight: 600; text-decoration: none; }
+.atable a.rowlink:hover { color: var(--accent-blue); }
+.admin .field input, .admin .field select, .admin .field textarea { font-size: 14px; padding: .6rem .7rem; }
+.admin .btn, .admin .btn-ghost { padding: .7rem 1.1rem; font-size: 11px; }
+.btn-sm { padding: .45rem .7rem !important; font-size: 10.5px !important; }
+.panel { background: var(--paper); padding: 1.25rem; min-width: 0; }
+.panel-title { font-family: var(--font-display); text-transform: uppercase; font-size: 1.6rem; line-height: 1; margin-bottom: 1rem; }

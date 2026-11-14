@@ -13,22 +13,30 @@ import { CustomEase } from "gsap/CustomEase";
 import { useCart } from "./cart/cart-context";
 import { BagIcon, LogoMark, SearchIcon, SnapchatIcon, TikTokIcon, WhatsAppIcon } from "./icons";
 import { LOGO_PATH, LOGO_VIEWBOX } from "./logo-path";
-import { COLLECTIONS, products } from "@/lib/catalog";
-import { site, whatsappLink } from "@/lib/site";
+import { handleFrom } from "@/lib/site";
+import { useCatalog, useSettings, useWhatsApp } from "./store-provider";
 
 if (typeof window !== "undefined") gsap.registerPlugin(CustomEase);
 
-const count = (handle: string) => products.filter(COLLECTIONS[handle]!.filter).length;
-const MENU = [
-  { href: "/collections/all", label: "Shop All", note: `${count("all")} pieces` },
-  { href: "/collections/new", label: "New In", note: `${count("new")} pieces` },
-  { href: "/collections/tees", label: "Tees", note: `${count("tees")} pieces` },
-  { href: "/collections/ringers", label: "Ringers", note: `${count("ringers")} pieces` },
-  { href: "/collections/long-sleeves", label: "Long Sleeves", note: `${count("long-sleeves")} piece` },
-  { href: "/lookbook", label: "Lookbook", note: "Drop 01" },
-  { href: "/about", label: "About", note: "The brand" },
-  { href: "/contact", label: "Contact", note: "WhatsApp" },
-];
+const plural = (n: number) => `${n} piece${n === 1 ? "" : "s"}`;
+
+/** Menu links: fixed order, counts and visibility from the live catalog. */
+function useMenu() {
+  const catalog = useCatalog();
+  return React.useMemo(() => {
+    const col = (handle: string, label?: string) => {
+      const c = catalog.collections.find((x) => x.handle === handle);
+      return c && c.slugs.length ? { href: `/collections/${handle}`, label: label ?? c.title, note: plural(c.slugs.length) } : null;
+    };
+    return [
+      col("all", "Shop All"), col("new", "New In"),
+      ...catalog.categories.map((c) => col(c.handle)),
+      { href: "/lookbook", label: "Lookbook", note: "The looks" },
+      { href: "/track-order", label: "Track Order", note: "No account needed" },
+      { href: "/contact", label: "Contact", note: "WhatsApp" },
+    ].filter((m): m is { href: string; label: string; note: string } => Boolean(m)).slice(0, 8);
+  }, [catalog]);
+}
 
 const iconBtn = "grid size-10 place-items-center hover:text-accent-blue focus-visible:outline-2 focus-visible:outline-ring";
 const BLUE = "rgba(28,63,255,0.42)";
@@ -98,6 +106,9 @@ function Shapes() {
 
 export function SiteHeader() {
   const { count: bagCount, setOpen: openBag, ready } = useCart();
+  const MENU = useMenu();
+  const settings = useSettings();
+  const wa = useWhatsApp();
   const containerRef = React.useRef<HTMLDivElement>(null);
   const ctxRef = React.useRef<gsap.Context | null>(null);
   const tlRef = React.useRef<gsap.core.Timeline | null>(null);
@@ -228,7 +239,7 @@ export function SiteHeader() {
     <div ref={containerRef} className="contents">
       <div className="bg-ink text-paper">
         <p className="mx-auto max-w-7xl gutter py-2 text-center font-mono text-[11px] uppercase tracking-[0.24em]">
-          {site.announcement} <span className="text-accent-blue">/</span> {site.slogan}
+          {settings.announcement && <>{settings.announcement} <span className="text-accent-blue">/</span> </>}{settings.slogan}
         </p>
       </div>
 
@@ -305,10 +316,10 @@ export function SiteHeader() {
                 ))}
               </ul>
               <div className="menu-footer">
-                <a data-menu-fade href={site.socials.tiktok.url} target="_blank" rel="noopener noreferrer" className="menu-social"><TikTokIcon size={18} /> {site.socials.tiktok.handle}</a>
-                <a data-menu-fade href={site.socials.snapchat.url} target="_blank" rel="noopener noreferrer" className="menu-social"><SnapchatIcon size={18} /> {site.socials.snapchat.handle}</a>
-                <a data-menu-fade href={whatsappLink("Hi MAVERICK!")} target="_blank" rel="noopener noreferrer" className="menu-social"><WhatsAppIcon size={18} /> {site.socials.whatsapp.display}</a>
-                <p data-menu-fade className="menu-slogan">{site.slogan}</p>
+                {settings.socials.tiktok && <a data-menu-fade href={settings.socials.tiktok} target="_blank" rel="noopener noreferrer" className="menu-social"><TikTokIcon size={18} /> {handleFrom(settings.socials.tiktok)}</a>}
+                {settings.socials.snapchat && <a data-menu-fade href={settings.socials.snapchat} target="_blank" rel="noopener noreferrer" className="menu-social"><SnapchatIcon size={18} /> {handleFrom(settings.socials.snapchat)}</a>}
+                <a data-menu-fade href={wa(`Hi ${settings.name}!`)} target="_blank" rel="noopener noreferrer" className="menu-social"><WhatsAppIcon size={18} /> {settings.whatsappDisplay}</a>
+                <p data-menu-fade className="menu-slogan">{settings.slogan}</p>
               </div>
             </div>
           </nav>

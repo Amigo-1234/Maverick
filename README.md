@@ -1,8 +1,8 @@
 # MAVERICK — DIFFERENT BY CHOICE.
 
-Online store for MAVERICK, a Nigerian menswear brand making oversized graphic tees, ringers and long sleeves.
+Online store and store-management system for MAVERICK, a Nigerian menswear brand making oversized graphic tees, ringers and long sleeves.
 
-Built with Next.js 16, React 19, Tailwind CSS 4 and GSAP.
+Built with Next.js 16, React 19, Tailwind CSS 4, GSAP and PostgreSQL (Supabase in production).
 
 ## Run it
 
@@ -10,134 +10,108 @@ You need Node.js 20 or newer.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # shop: http://localhost:3000   admin: http://localhost:3000/admin
 ```
 
-To build for production:
+With no `DATABASE_URL` set, the site uses a built-in local database stored in `.data/`. It's real PostgreSQL (PGlite), seeded with the Drop 01 catalog. To sign in to the admin, put `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env.local` first (see `.env.example`).
 
-```bash
-npm run build
-npm start
-```
+## What's in it
 
-## What's in the store
+**Shop** (`app/(store)`)
 
 | Page | Route |
 | --- | --- |
 | Home: clothing rail hero, shop by cut, new in, spotlight, lookbook marquee | `/` |
-| Collections with colour filter and sorting | `/collections/all`, `/collections/new`, `/collections/tees`, `/collections/ringers`, `/collections/long-sleeves` |
-| Product pages: front/back gallery, sizes, add to bag, Order on WhatsApp | `/products/[slug]` |
-| Bag (slide-out drawer and full page) | `/cart` |
-| Checkout (test mode) and order confirmation | `/checkout`, `/checkout/success` |
-| Search | `/search` |
-| Lookbook, About, Size guide, Shipping & returns, FAQ, Contact | `/lookbook`, `/about`, `/size-guide`, `/shipping-returns`, `/faq`, `/contact` |
+| Collections and categories (filter, sort) | `/collections/[handle]` |
+| Product pages: gallery, colour and size, live stock, sale prices, Order on WhatsApp, **Ask about this product** | `/products/[slug]` |
+| Bag, checkout (Paystack, delivery by state, discount codes), payment confirmation | `/cart`, `/checkout`, `/checkout/verify` |
+| **Track your order** (no account needed) | `/track-order` |
+| Search, lookbook, about, size guide, shipping & returns, FAQ, contact, terms, privacy | … |
 
-The navbar is a full-screen GSAP menu, and a floating WhatsApp button opens a chat on every page except checkout.
+**Admin** (`app/admin`): sign in at `/admin/login`.
 
-## Where things live
-
-| To change… | Edit |
+| Section | What it does |
 | --- | --- |
-| Products: names, prices, sizes, descriptions, images | `lib/catalog.ts` |
-| Currency, delivery rates, free-delivery threshold, returns, size chart, socials, email | `lib/site.ts` |
-| Colours, fonts and shared styles | `app/globals.css` |
-| Navbar and full-screen menu | `components/site-header.tsx` |
-| Clothing rail hero (supplied component, unmodified) | `components/clothing-rail-hero.tsx` |
-| Icons (SVG) and the logo mark | `components/icons.tsx` |
-| Business name, CAC number and address on the legal pages | `site.legal` in `lib/site.ts` |
-| Mark a size sold out | add `stock: { XL: 0 }` to the product in `lib/catalog.ts` |
+| Overview | Net revenue (paid orders minus refunds), sales, pipeline counts, stock health, revenue by day for any date range, top sellers, recent orders and inquiries |
+| Orders | Search and filter by payment, fulfilment and date. The order page has items, customer, address, timeline, status changes (with customer emails), tracking, internal notes, refunds (through Paystack) and resending the confirmation |
+| Products | Create, edit, publish/unpublish, archive or delete. Sale prices, categories, collections, materials and care. Front/back/side cut-outs (with optional background removal) and gallery photos |
+| Inventory | Stock per size and colour: set, add, remove, mark sold out, restore, low-stock alert levels, stock held by unpaid checkouts, full adjustment history with who changed it |
+| Collections | Hand-picked collections (with visibility) and categories |
+| Customers | Spend, order count and last purchase for each customer, plus their order history |
+| Inquiries | Product questions inbox: search, filter by product, status, internal notes, reply by email or WhatsApp |
+| Discounts | Percent or naira codes with minimum order, start/end dates, usage limit, on/off |
+| Delivery | Delivery options by state, fees, delivery times, pickup, instructions, free-delivery threshold |
+| Settings | Store name, emails, WhatsApp number, socials, announcement, maintenance mode, legal details, team accounts and passwords |
+| Activity log | Every sign-in and change, with who made it |
 
-## Before launch
+## How the important parts work
 
-These are **placeholders**. Replace them with real values:
+- **Payment vs fulfilment:** each order has a *payment status* (pending → paid → refunded), set only from verified Paystack transactions and refunds, and a separate *fulfilment status* (processing → preparing → shipped → delivered, plus on hold, cancelled, refund requested) set by staff. Staff can't mark an order paid, and unpaid orders can't be shipped.
+- **Stock and overselling:** checkout reserves stock with one atomic database update (`stock = stock − qty WHERE stock ≥ qty`). The database also refuses negative stock. Paying commits the reservation. A failed, cancelled or expired payment (after `STOCK_RESERVATION_MINUTES`, default 30) gives the stock back. If someone pays after their reservation expired and the item sold out meanwhile, the order is flagged *Needs attention*.
+- **Duplicate payments and webhooks:** the return page and the webhook both call the same confirm step. "Mark as paid" can only succeed once, and each webhook event id is recorded first, so retries change nothing and no email is sent twice.
+- **Emails (Resend):**
+  - The shop gets an alert for each order and inquiry.
+  - The customer gets a receipt with a signed tracking link, an email for each status change (at most one per status), and a refund email.
+- **Order tracking:** the customer enters the order number plus the email *or* phone on the order. Wrong details get the same message as a made-up number, and lookups are rate-limited. Links in emails carry an HMAC token instead.
+- **Security:**
+  - Admins sign in with scrypt-hashed passwords. Sessions are random tokens, and only their SHA-256 hash is stored.
+  - Every admin page, server action and admin API checks the session on the server.
+  - Sign-in, checkout, tracking, inquiries and forms are rate-limited in the database.
+  - Sensitive admin actions go to the activity log.
+  - Secret keys stay server-side.
+  - Every table has row-level security on with no public policies, so Supabase's public API can't read anything.
+- **Images:** uploads are processed with `sharp` and stored in the database (`media` table), served from `/media/<id>` with long-lived caching. No separate storage service is needed.
 
-- **Prices**: currently ₦25,000–₦32,000 in `lib/catalog.ts`.
-- **Sizes and stock**: all pieces are listed as S–XXL and in stock.
-- **Delivery and returns**: Lagos ₦3,500, Nationwide ₦6,000, free over ₦100,000, 7-day returns, all set in `lib/site.ts`.
-- **Size chart measurements**: in `lib/site.ts`.
-- **Contact email**: `hello@maverick.example` in `lib/site.ts`.
-- **Business details** for the Terms and Privacy pages: `site.legal` in `lib/site.ts`.
-- **Keys**: Paystack, Resend and the admin password (see below).
+## Database
 
-## Payments, email and orders
+Migrations are plain SQL in `db/migrations/` (versioned `0001_…`, `0002_…`):
 
-Everything is configured with environment variables. Copy `.env.example` to `.env.local` and fill it in on your computer. On the live host, add the same names in its settings. **Never** commit `.env.local`, or paste secret keys into chats or emails.
+- `0001_schema.sql`: all tables, constraints and row-level security.
+- `0002_seed.sql`: the original catalog, settings and delivery options. Stock and prices are placeholders.
 
-### 1. Paystack (payments)
+Locally they apply automatically. For Supabase:
 
-1. Sign in at [dashboard.paystack.com](https://dashboard.paystack.com) and go to **Settings → API Keys & Webhooks**.
-2. Copy the **Test Secret Key** (`sk_test_…`) into `PAYSTACK_SECRET_KEY`.
-3. Set the **Test Webhook URL** to `https://YOUR-DOMAIN/api/paystack/webhook`.
-4. Place a test order with one of Paystack's test cards. Check that it appears on `/admin` and that both emails arrive.
-5. When Paystack has activated the business, swap in the **Live Secret Key** (`sk_live_…`) and set the **Live Webhook URL** to the same address.
+1. Create a Supabase project. Under **Project Settings → Database → Connection string**, copy the **Transaction pooler** URL.
+2. Run `DATABASE_URL="postgres://…" npm run db:migrate`. It's safe to run again; already-applied migrations are skipped.
+3. Set the same `DATABASE_URL` on the host.
 
-How it works:
+To add a migration later, add `db/migrations/0003_….sql`. It's bundled into the app automatically on `dev`/`build`.
 
-- The server re-prices every order from `lib/catalog.ts`, so customers can't change what they pay.
-- Paystack hosts the payment page (card, bank transfer, USSD).
-- `/checkout/verify` confirms each payment with Paystack before showing "Order placed".
-- The signed webhook confirms payments even if the customer closes the tab, and triggers the emails.
+## Environment variables
 
-### 2. Email (Resend)
+See `.env.example` for every variable with instructions. Required in production:
 
-1. Create an account at [resend.com](https://resend.com) and **verify your domain** so emails don't go to spam.
-2. Set `RESEND_API_KEY`, `EMAIL_FROM` (e.g. `MAVERICK <orders@yourdomain.com>`) and `ORDER_NOTIFY_EMAIL` (the owner's inbox).
-3. Optionally create an Audience and set `RESEND_AUDIENCE_ID` to collect newsletter sign-ups there.
+`NEXT_PUBLIC_SITE_URL`, `DATABASE_URL`, `APP_SECRET`, `ADMIN_EMAIL` + `ADMIN_PASSWORD` (first sign-in only), `PAYSTACK_SECRET_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `ORDER_NOTIFY_EMAIL`.
 
-Once this is set up:
+Store details (WhatsApp number, socials, delivery fees, announcement and so on) live in **Admin → Settings / Delivery**, not in environment variables.
 
-- The owner gets a "New order" email for every paid order.
-- The customer gets a receipt.
-- Contact-form messages arrive with reply-to set to the customer.
+## Deploying (Vercel + Supabase)
 
-### 3. Orders admin
-
-Set `ADMIN_PASSWORD` to a long password, then visit `/admin`. It lists paid orders straight from Paystack, with:
-
-- items and sizes
-- delivery address
-- phone number, with a one-tap WhatsApp link to the customer
-
-Paystack is the order record, so there's no separate database to look after.
-
-### 4. Going live (Vercel)
-
-1. On [vercel.com](https://vercel.com), import the GitHub repo (it's detected as Next.js automatically).
-2. Add every variable from `.env.example` under **Settings → Environment Variables**, and set `NEXT_PUBLIC_SITE_URL` to the real address (e.g. `https://maverickwear.com`).
-3. Add the domain under **Settings → Domains** and follow the DNS steps. HTTPS is automatic.
-4. Update the Paystack webhook URL to the real domain, then place a test order end to end.
-
-## Images
-
-All imagery is the client's own:
-
-- `source-images/`: the original garment photos and the logo.
-- `public/originals/`: the photos shown on the site, unedited.
-- `public/garments/`: transparent cut-outs made from those photos.
-- `public/brand/`: the logo, plus a vector version traced from it.
-
-To regenerate the derived images after changing a photo:
-
-```bash
-node scripts/cutouts.mjs      # garment cut-outs
-node scripts/trace-logo.mjs   # vector logo
-```
+1. Create the Supabase database and run the migrations (above).
+2. On [vercel.com](https://vercel.com), import the GitHub repo.
+3. Add the environment variables. Start with the Paystack **test** key.
+4. Deploy, then sign in at `/admin/login` with `ADMIN_EMAIL` / `ADMIN_PASSWORD`. That creates the owner account.
+5. In Paystack → Settings → API Keys & Webhooks, set the webhook URL to `https://YOUR-DOMAIN/api/paystack/webhook`.
+6. Place a test order with a Paystack test card, then check that it shows in Admin → Orders, both emails arrive, and stock went down.
+7. Add the domain in Vercel → Settings → Domains. Swap to the **live** Paystack key and live webhook URL.
 
 ## Tests
 
-End-to-end checks run in your installed Google Chrome against a running build:
+End-to-end checks run in your installed Google Chrome against a production build:
 
 ```bash
-npm run build && npx next start -p 3123
-node scripts/e2e-shop.mjs   # bag, sorting, search, checkout, WhatsApp, phone layout
-node scripts/e2e-menu.mjs   # navbar menu: open, close, focus, links
+npm run build
+node scripts/e2e-payments.mjs   # Part C: orders, stock, webhooks, refunds, tracking, inquiries, admin (≈90 checks)
+npx next start -p 3123 &        # then, against that server:
+node scripts/e2e-shop.mjs       # bag, sorting, search, WhatsApp, phone layout
+node scripts/e2e-menu.mjs       # navbar menu
 ```
 
-The payment test starts its own local stand-ins for Paystack and Resend, so it needs no keys and moves no money:
+`e2e-payments.mjs` is **simulated**: it starts local stand-ins for Paystack and Resend (`scripts/mock-services.mjs`) and a throwaway database. It proves the site's logic, not the real Paystack or Resend accounts. Test those with your test keys before going live.
 
-```bash
-npm run build && node scripts/e2e-payments.mjs   # pay, cancel, webhook, emails, admin, tampering, forms, SEO
-```
+## Images and brand assets
+
+All imagery is the client's own: `source-images/` (originals), `public/originals/`, `public/garments/` (cut-outs), `public/brand/` (logo). Regenerate derived images with `node scripts/cutouts.mjs` and `node scripts/trace-logo.mjs`. New product images are uploaded in the admin.
 
 ## Contact
 

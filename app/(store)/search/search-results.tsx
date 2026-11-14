@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { products } from "@/lib/catalog";
+import { useCatalog } from "@/components/store-provider";
 import { ProductCard } from "@/components/product-card";
 
 export function SearchResults() {
   const params = useSearchParams();
+  const { products } = useCatalog();
   const [q, setQ] = React.useState(params.get("q") ?? "");
   React.useEffect(() => { setQ(params.get("q") ?? ""); }, [params]);
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);

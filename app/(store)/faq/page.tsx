@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { site } from "@/lib/site";
+import { getStorefront } from "@/lib/server/store";
 import { PlusIcon } from "@/components/icons";
 
 export const metadata: Metadata = { title: "FAQ" };
 
-const faqs = [
-  ["How do MAVERICK tees fit?", <>Oversized and boxy, with dropped shoulders. Take your usual size for the intended fit. See the <Link className="underline" href="/size-guide">size guide</Link> for measurements.</>],
-  ["Will the print crack or fade?", <>Wash inside out on cold and don&apos;t tumble dry. The print will last much longer that way.</>],
-  ["When is the next drop?", <>Join the list at the bottom of any page and you&apos;ll hear about Drop 02 first.</>],
-  ["Can I return or exchange?", <>Yes, within {site.returnsDays} days, unworn with tags on. The details are on <Link className="underline" href="/shipping-returns">Shipping &amp; returns</Link>.</>],
-  ["Do you restock?", <>Some pieces come back, some don&apos;t. If you want a piece, don&apos;t wait.</>],
-] as const;
 
-export default function Faq() {
+
+export default async function Faq() {
+  const { settings, zones } = await getStorefront();
+  void zones;
+  const faqs = [
+    ["How do MAVERICK tees fit?", <>Oversized and boxy, with dropped shoulders. Take your usual size for the intended fit. See the <Link className="underline" href="/size-guide">size guide</Link> for measurements.</>],
+    ["Will the print crack or fade?", <>Wash inside out on cold and don&apos;t tumble dry. The print will last much longer that way.</>],
+    ["How do I track my order?", <>Use <Link className="underline" href="/track-order">Track your order</Link> with your order number and the email or phone you used at checkout, or tap the link in your confirmation email. No account needed.</>],
+    ["When is the next drop?", <>Join the list at the bottom of any page and you&apos;ll hear about Drop 02 first.</>],
+    ["Can I return or exchange?", <>Yes, within {settings.returnsDays} days, unworn with tags on. The details are on <Link className="underline" href="/shipping-returns">Shipping &amp; returns</Link>.</>],
+    ["Do you restock?", <>Some pieces come back, some don&apos;t. If you want a piece, don&apos;t wait.</>],
+  ] as const;
   return (
     <div className="mx-auto max-w-7xl gutter pb-24 pt-10">
       <PageHeader eyebrow="FAQ" title="Questions" />

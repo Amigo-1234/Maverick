@@ -1,46 +1,49 @@
-import { randomBytes } from "node:crypto";
-import { priceCart, readCustomer, toKobo, type CartLine, type OrderRecord } from "@/lib/order";
+import { readCustomer, toKobo, type CartLine } from "@/lib/order";
 import { config, paymentsReady } from "@/lib/server/config";
-import { initializeTransaction, PaystackError } from "@/lib/server/paystack";
+import { createOrder, OrderError, releaseOrder, orderByNumber } from "@/lib/server/orders";
+import { initializeTransaction } from "@/lib/server/paystack";
+import { clientIp, rateLimit } from "@/lib/server/security";
+import { readSettings, CATALOG_TAG } from "@/lib/server/store";
+import { revalidateTag } from "next/cache";
 
-/** Starts a Paystack payment for the bag. Prices are recomputed here from the catalog. */
+/** Creates the order (reserving stock) and starts a Paystack payment for it. All prices are computed here. */
 export async function POST(request: Request) {
-  if (!paymentsReady()) {
-    return Response.json({ error: "Card payments aren't switched on yet. Please order on WhatsApp for now." }, { status: 503 });
-  }
-  const body = (await request.json().catch(() => null)) as { customer?: Record<string, unknown>; lines?: CartLine[]; shipping?: string } | null;
+  const settings = await readSettings();
+  if (settings.maintenance) return Response.json({ error: "The shop is closed for maintenance. Please check back soon." }, { status: 503 });
+  if (!paymentsReady()) return Response.json({ error: "Card payments aren't switched on yet. Please order on WhatsApp for now." }, { status: 503 });
+  if (!(await rateLimit("checkout", await clientIp(request), 15, 600))) return Response.json({ error: "Too many attempts. Please wait a few minutes." }, { status: 429 });
+
+  const body = (await request.json().catch(() => null)) as { customer?: Record<string, unknown>; lines?: CartLine[]; zoneId?: number; discountCode?: string } | null;
   if (!body) return Response.json({ error: "Something went wrong reading your order. Please try again." }, { status: 400 });
+  const { customer, errors } = readCustomer(body.customer ?? {});
+  if (!customer) return Response.json({ error: errors[0], errors }, { status: 422 });
 
-  const { customer, errors: customerErrors } = readCustomer(body.customer ?? {});
-  const priced = priceCart(body.lines ?? [], String(body.shipping ?? ""));
-  const errors = [...customerErrors, ...priced.errors];
-  if (errors.length || !customer || !priced.shipping) return Response.json({ error: errors[0] ?? "Check your details.", errors }, { status: 422 });
-
-  const reference = `MV-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`;
-  const order: OrderRecord = {
-    orderId: reference,
-    customer,
-    shipping: { id: priced.shipping.id, label: priced.shipping.label, eta: priced.shipping.eta, price: priced.delivery },
-    items: priced.items,
-    subtotal: priced.subtotal,
-    delivery: priced.delivery,
-    total: priced.total,
-    currency: "NGN",
-  };
-  const origin = request.headers.get("origin") || new URL(request.url).origin || config.siteUrl;
-
+  let order;
   try {
-    const tx = await initializeTransaction({
-      email: customer.email,
-      amountKobo: toKobo(order.total),
-      reference,
-      callbackUrl: `${origin}/checkout/verify`,
-      order,
-    });
-    return Response.json({ url: tx.authorization_url, reference: tx.reference });
+    order = await createOrder({ customer, lines: body.lines ?? [], zoneId: Number(body.zoneId), discountCode: String(body.discountCode ?? "") });
   } catch (e) {
-    console.error("[checkout] Paystack initialize failed:", e);
-    const msg = e instanceof PaystackError ? "We couldn't reach the payment provider. Please try again in a moment." : "Something went wrong. Please try again.";
-    return Response.json({ error: msg }, { status: 502 });
+    if (e instanceof OrderError) return Response.json({ error: e.message }, { status: e.status });
+    console.error("[checkout] create failed", e);
+    return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });
+  }
+
+  revalidateTag(CATALOG_TAG, "max"); // stock was reserved
+  const origin = request.headers.get("origin") || new URL(request.url).origin || config.siteUrl;
+  try {
+    const full = await orderByNumber(order.number);
+    const tx = await initializeTransaction({
+      email: order.email, amountKobo: toKobo(order.total), reference: order.number,
+      callbackUrl: `${origin}/checkout/verify`, cancelUrl: `${origin}/checkout?cancelled=1`,
+      summary: {
+        customer: `${customer.firstName} ${customer.lastName}`, phone: customer.phone,
+        items: full?.items.map((i) => `${i.qty}× ${i.name} (${i.colour}, ${i.size})`).join("; ") ?? "",
+        delivery: `${full?.deliveryLabel}: ${[customer.address1, customer.city, customer.state].join(", ")}`,
+      },
+    });
+    return Response.json({ url: tx.authorization_url, reference: order.number });
+  } catch (e) {
+    console.error("[checkout] Paystack initialize failed", e);
+    await releaseOrder(order.number, "failed").catch(() => {});
+    return Response.json({ error: "We couldn't reach the payment provider. Please try again in a moment." }, { status: 502 });
   }
 }
