@@ -18,7 +18,7 @@ await page.getByRole("button", { name: /Add to bag/ }).click();
 const drawer = page.getByRole("dialog", { name: "Your bag" });
 await drawer.waitFor({ state: "visible" });
 ok(await drawer.getByText("Size L").isVisible(), "drawer opens with Strike Tee, size L");
-ok(await drawer.getByText(/₦75,000 away from free delivery/).isVisible(), "free-delivery bar shows the naira amount left");
+ok(await drawer.getByText(/₦73,000 away from free delivery/).isVisible(), "free-delivery bar shows the naira amount left");
 await page.screenshot({ path: `${shots}/e2e-drawer.png` });
 await drawer.getByRole("button", { name: /Increase quantity/ }).click();
 ok((await drawer.locator("[aria-live=polite]").first().textContent()) === "2", "quantity goes up to 2");
@@ -42,7 +42,7 @@ ok((await page.locator("header [data-bag-count]").textContent()) === "3", "bag c
 // sort + filter
 await page.goto(`${base}/collections/all?sort=price-asc`);
 const firstPrice = await page.locator("article").first().locator("span.price").last().textContent();
-ok(firstPrice === "₦25,000", `sort price low-high puts ₦25,000 first (got ${firstPrice})`);
+ok(firstPrice === "₦27,000", `sort price low-high puts ₦27,000 first (got ${firstPrice})`);
 await page.waitForLoadState("networkidle");
 await page.getByRole("button", { name: "White", exact: true }).click();
 await page.waitForFunction(() => document.querySelectorAll("article").length === 2, null, { timeout: 3000 }).catch(() => {});

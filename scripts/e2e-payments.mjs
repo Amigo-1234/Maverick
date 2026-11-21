@@ -114,13 +114,13 @@ try {
   // ── 19. Delivery fee validation ──
   console.log("\n# Delivery and discounts");
   const lagosQuote = await (await api("/api/checkout/quote", { lines: [{ slug: "strike-tee-black-blue", size: "M", qty: 1 }], state: "Lagos", zoneId: 1 })).json();
-  ok(lagosQuote.delivery?.fee === 3500 && lagosQuote.total === 28500, "Lagos delivery is priced by the server (₦25,000 + ₦3,500)");
+  ok(lagosQuote.delivery?.fee === 3500 && lagosQuote.total === 30500, "Lagos delivery is priced by the server (₦27,000 + ₦3,500)");
   const wrongZone = await api("/api/checkout/quote", { lines: [{ slug: "strike-tee-black-blue", size: "M", qty: 1 }], state: "Lagos", zoneId: 2 });
   ok(wrongZone.status === 422, "a delivery option that doesn't cover the state is refused");
   const kano = await (await api("/api/checkout/quote", { lines: [{ slug: "strike-tee-black-blue", size: "M", qty: 1 }], state: "Kano", zoneId: 2 })).json();
   ok(kano.delivery?.fee === 6000, "other states get the nationwide fee");
   const free = await (await api("/api/checkout/quote", { lines: [{ slug: "strike-tee-black-blue", size: "M", qty: 4 }], state: "Kano", zoneId: 2 })).json();
-  ok(free.delivery?.fee === 0 && free.total === 100000, "delivery is free over the threshold");
+  ok(free.delivery?.fee === 0 && free.total === 108000, "delivery is free over the threshold");
 
   // ── 18. Discounts ──
   await page.goto(`${SITE}/admin/discounts`);
@@ -129,7 +129,7 @@ try {
   await page.fill("#minOrder", "0");
   await page.fill("#code", "OLDCODE"); await page.fill("#value", "50"); await page.fill("#expiresAt", "2020-01-01"); await act(() => page.getByRole("button", { name: "Create code" }).click());
   const disc = await (await api("/api/checkout/quote", { lines: [{ slug: "strike-tee-black-blue", size: "M", qty: 1 }], state: "Lagos", zoneId: 1, discountCode: "ten10" })).json();
-  ok(disc.discount?.amount === 2500 && disc.total === 26000, "a valid code takes 10% off on the server (₦25,000 → ₦22,500 + delivery)");
+  ok(disc.discount?.amount === 2700 && disc.total === 27800, "a valid code takes 10% off on the server (₦27,000 → ₦24,300 + delivery)");
   const expired = await (await api("/api/checkout/quote", { lines: [{ slug: "strike-tee-black-blue", size: "M", qty: 1 }], state: "Lagos", zoneId: 1, discountCode: "OLDCODE" })).json();
   ok(String(expired.error).includes("expired"), "an expired code is refused");
   const bogus = await (await api("/api/checkout/quote", { lines: [{ slug: "strike-tee-black-blue", size: "M", qty: 1 }], state: "Lagos", zoneId: 1, discountCode: "FREEMONEY" })).json();
