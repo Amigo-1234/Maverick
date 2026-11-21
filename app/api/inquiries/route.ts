@@ -21,5 +21,5 @@ export async function POST(request: Request) {
 
   const m = inquiryAlertEmail({ ...data, product: saved.productName, id: saved.id });
   await notifyShop(m.subject, m.html, data.email).catch((e) => console.error("[inquiry email]", e)); // saved either way
-  return Response.json({ ok: true, id: saved.id });
+  return Response.json({ ok: true, id: saved.id, token: saved.token });
 }

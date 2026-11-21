@@ -136,6 +136,27 @@ ${button(`${config.siteUrl}/admin/inquiries?id=${i.id}`, "Open in admin")}`),
   };
 }
 
+export function inquiryFollowUpEmail(i: { id: number; name: string; product: string; message: string }) {
+  return {
+    subject: `New chat message from ${i.name}: ${i.product || "MAVERICK"}`,
+    html: layout(`<h2 style="margin:0 0 12px">New customer message</h2>
+<p style="margin:0"><strong>${esc(i.name)}</strong> followed up about ${esc(i.product || "a product")}.</p>
+<p style="white-space:pre-wrap;margin:14px 0 0">${esc(i.message)}</p>
+${button(`${config.siteUrl}/admin/inquiries?id=${i.id}`, "Reply in admin")}`),
+  };
+}
+
+export function inquiryReplyEmail(i: { id: number; name: string; product: string; message: string; token?: string }) {
+  const chatUrl = i.token ? `${config.siteUrl}/products/${encodeURIComponent(i.product)}?chat=${i.id}&token=${encodeURIComponent(i.token)}` : config.siteUrl;
+  return {
+    subject: `MAVERICK replied to your question`,
+    html: layout(`<h2 style="margin:0 0 12px">Hi ${esc(i.name)}, MAVERICK replied.</h2>
+<p style="white-space:pre-wrap;margin:0">${esc(i.message)}</p>
+<p style="margin:16px 0 0">Return to the product page on this device to continue the conversation.</p>
+${button(chatUrl, "Open MAVERICK")}`),
+  };
+}
+
 export function contactEmail(m: { name: string; email: string; order?: string; message: string }) {
   return {
     subject: `Website message from ${m.name}`,

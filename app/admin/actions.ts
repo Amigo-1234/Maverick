@@ -11,8 +11,8 @@ import { addOrderNote, orderById, OrderError, recordRefund, setFulfilment, setTr
 import { notifyStatusChange, resendReceipt } from "@/lib/server/payments";
 import { refundTransaction } from "@/lib/server/paystack";
 import { paymentsReady, emailReady } from "@/lib/server/config";
-import { refundEmail, sendEmail } from "@/lib/server/email";
-import { updateInquiry, type InquiryStatus } from "@/lib/server/inquiries";
+import { inquiryReplyEmail, refundEmail, sendEmail } from "@/lib/server/email";
+import { addAdminMessage, updateInquiry, type InquiryStatus } from "@/lib/server/inquiries";
 import { CATALOG_TAG } from "@/lib/server/store";
 import type { FulfilmentStatus } from "@/lib/order";
 
@@ -200,6 +200,21 @@ export async function saveInquiry(f: FormData) {
   const admin = await requireAdmin();
   const id = num(f, "id");
   return run(backTo(f, `/admin/inquiries?id=${id}`), () => updateInquiry(admin, id, str(f, "status", 20) as InquiryStatus, str(f, "notes", 5000)), "Inquiry updated.");
+}
+
+export async function replyInquiry(f: FormData) {
+  const admin = await requireAdmin();
+  const id = num(f, "id"), message = str(f, "message", 3000);
+  if (!message) go(`/admin/inquiries?id=${id}`, "error", "Type a reply first.");
+  return run(backTo(f, `/admin/inquiries?id=${id}`), async () => {
+    const inquiry = await addAdminMessage(admin, id, message);
+    if (emailReady()) {
+      const mail = inquiryReplyEmail({ id, name: inquiry.name, product: inquiry.productName, message });
+      await sendEmail({ to: inquiry.email, subject: mail.subject, html: mail.html }).catch((e) => console.error("[chat reply email]", e));
+      return "Reply sent in chat and by email.";
+    }
+    return "Reply added to the chat. Email notifications are not configured.";
+  }, "Reply sent.");
 }
 
 // ───────────── Discounts ─────────────

@@ -258,15 +258,16 @@ try {
   console.log("\n# Inquiries");
   await cust.goto(`${SITE}/products/strike-tee-white-yellow`); await settle(cust);
   await cust.getByRole("button", { name: "Size XL", exact: true }).click();
-  await cust.getByRole("button", { name: "Ask about this product" }).click();
+  await cust.getByRole("button", { name: "Chat about this product" }).click();
+  await cust.getByRole("tab", { name: "WhatsApp" }).click();
   await cust.fill("#ask-wa-q", "Is XL very long?");
   const wa = decodeURIComponent(await cust.getByTestId("ask-whatsapp").getAttribute("href"));
   if (!wa.includes("Is XL very long?") || !wa.startsWith("https://wa.me/2347025244302")) console.log("   wa:", wa);
   ok(wa.startsWith("https://wa.me/2347025244302") && wa.includes("Strike Tee") && wa.includes("/products/strike-tee-white-yellow") && wa.includes("Size: XL") && wa.includes("Colour: White / Yellow") && wa.includes("Is XL very long?"), "WhatsApp link has the store number, product, link, size, colour and question");
-  await cust.getByRole("tab", { name: "Send an inquiry" }).click();
-  await cust.fill("#ask-name", "Tunde Bello"); await cust.fill("#ask-email", "tunde@example.com"); await cust.fill("#ask-msg", "Will you restock this in XXL?");
-  await cust.getByRole("button", { name: "Send question" }).click();
-  ok(await cust.getByText("Question sent.").waitFor({ timeout: 10000 }).then(() => true, () => false), "the inquiry is sent and confirmed");
+  await cust.getByRole("tab", { name: "Website chat" }).click();
+  await cust.fill("#chat-name", "Tunde Bello"); await cust.fill("#chat-email", "tunde@example.com"); await cust.fill("#chat-first", "Will you restock this in XXL?");
+  await cust.getByRole("button", { name: "Start chat" }).click();
+  ok(await cust.getByText("Will you restock this in XXL?").waitFor({ timeout: 10000 }).then(() => true, () => false), "the customer starts a product conversation");
   const dup = await api("/api/inquiries", { name: "Tunde Bello", email: "tunde@example.com", product: "strike-tee-white-yellow", message: "Will you restock this in XXL?" });
   ok(dup.status === 409, "sending the same question again is blocked");
   const bot = await api("/api/inquiries", { name: "Bot", email: "bot@example.com", message: "spam", company: "Acme" });
@@ -274,9 +275,13 @@ try {
   st = await state();
   ok(st.sent.some((m) => m.to === "shop@maverick.test" && m.subject.startsWith("Product question") && m.html.includes("restock")), "the shop is emailed about the inquiry");
   await page.goto(`${SITE}/admin/inquiries`);
-  ok(await seen(page, "Will you restock this in XXL?"), "the inquiry appears in the admin inbox");
-  await page.selectOption("#inq-status", "answered"); await page.fill("#inq-notes", "Replied by email, restock in Dec"); await act(() => page.getByRole("button", { name: "Save" }).last().click());
-  ok(await page.getByText("Answered").first().isVisible(), "admin marks it answered with an internal note");
+  ok(await seen(page, "Will you restock this in XXL?"), "the conversation appears in the admin inbox");
+  await page.fill("#reply-message", "Yes — XXL is coming back in December."); await act(() => page.getByRole("button", { name: "Send reply" }).click());
+  ok(await seen(page, "Yes — XXL is coming back in December."), "the owner replies inside the admin conversation");
+  await cust.reload(); await cust.getByRole("button", { name: "Chat about this product" }).click();
+  ok(await cust.getByText("Yes — XXL is coming back in December.").waitFor({ timeout: 10000 }).then(() => true, () => false), "the customer receives the owner's reply in the same chat");
+  await cust.fill("#chat-message", "Perfect, thank you."); await cust.getByRole("button", { name: "Send message" }).click();
+  ok(await cust.getByText("Perfect, thank you.").waitFor({ timeout: 10000 }).then(() => true, () => false), "the customer can continue the conversation");
   await page.goto(`${SITE}/admin/inquiries?q=Tunde`);
   ok(await seen(page, "Tunde Bello"), "the inbox can be searched");
 

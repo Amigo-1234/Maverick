@@ -1,5 +1,6 @@
 /** Product inquiries (server only). Kept separate from orders. */
-import { one, sql } from "./db";
+import { randomBytes } from "node:crypto";
+import { one, sql, tx } from "./db";
 import { fingerprint } from "./security";
 import { logActivity, type Admin } from "./admin";
 
@@ -11,6 +12,8 @@ export type Inquiry = {
   size: string; colour: string; message: string; status: InquiryStatus; notes: string; createdAt: string; updatedAt: string;
 };
 
+export type InquiryMessage = { id: number; sender: "customer" | "admin"; author: string; body: string; createdAt: string };
+
 type Row = { id: number; name: string; email: string; phone: string; product_id: number | null; product_name: string; slug: string | null; size: string; colour: string; message: string; status: InquiryStatus; notes: string; created_at: Date; updated_at: Date };
 const map = (r: Row): Inquiry => ({ id: r.id, name: r.name, email: r.email, phone: r.phone, productId: r.product_id, productName: r.product_name, productSlug: r.slug,
   size: r.size, colour: r.colour, message: r.message, status: r.status, notes: r.notes, createdAt: new Date(r.created_at).toISOString(), updatedAt: new Date(r.updated_at).toISOString() });
@@ -21,10 +24,16 @@ export async function createInquiry(i: { name: string; email: string; phone: str
   const fp = fingerprint(i.email.toLowerCase(), i.productSlug, i.message.toLowerCase().replace(/\s+/g, " ").trim());
   const dupe = await one("select id from inquiries where fingerprint = $1 and created_at > now() - interval '24 hours'", [fp]);
   if (dupe) return { duplicate: true as const };
-  const row = await one<{ id: number }>(
-    "insert into inquiries (name, email, phone, product_id, product_name, size, colour, message, fingerprint) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id",
-    [i.name, i.email, i.phone, product?.id ?? null, productName, i.size, i.colour, i.message, fp]);
-  return { duplicate: false as const, id: row!.id, productName };
+  const token = randomBytes(24).toString("base64url");
+  const tokenHash = fingerprint("inquiry-chat", token);
+  const row = await tx(async (q) => {
+    const created = (await q.query<{ id: number }>(
+      "insert into inquiries (name, email, phone, product_id, product_name, size, colour, message, fingerprint, customer_token_hash, customer_last_read_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) returning id",
+      [i.name, i.email, i.phone, product?.id ?? null, productName, i.size, i.colour, i.message, fp, tokenHash]))[0];
+    await q.query("insert into inquiry_messages (inquiry_id, sender, author, body) values ($1,'customer',$2,$3)", [created.id, i.name, i.message]);
+    return created;
+  });
+  return { duplicate: false as const, id: row.id, token, productName };
 }
 
 export async function listInquiries(f: { q?: string; status?: string; product?: string }) {
@@ -32,7 +41,7 @@ export async function listInquiries(f: { q?: string; status?: string; product?: 
   if (f.q?.trim()) { p.push(`%${f.q.trim()}%`); where.push(`(i.name ilike $${p.length} or i.email ilike $${p.length} or i.phone ilike $${p.length} or i.message ilike $${p.length})`); }
   if (f.status) { p.push(f.status); where.push(`i.status = $${p.length}`); }
   if (f.product) { p.push(Number(f.product)); where.push(`i.product_id = $${p.length}`); }
-  const rows = await sql<Row>(`select i.*, p.slug from inquiries i left join products p on p.id = i.product_id ${where.length ? `where ${where.join(" and ")}` : ""} order by i.created_at desc limit 200`, p);
+  const rows = await sql<Row>(`select i.*, p.slug from inquiries i left join products p on p.id = i.product_id ${where.length ? `where ${where.join(" and ")}` : ""} order by i.updated_at desc limit 200`, p);
   return rows.map(map);
 }
 
@@ -45,4 +54,44 @@ export async function updateInquiry(admin: Admin, id: number, status: InquirySta
   if (!(status in INQUIRY_LABELS)) throw new Error("Unknown status.");
   await sql("update inquiries set status = $2, notes = $3, updated_at = now() where id = $1", [id, status, notes.slice(0, 5000)]);
   await logActivity(admin, "inquiry_update", "inquiry", String(id), { status });
+}
+
+const messageMap = (r: { id: number; sender: "customer" | "admin"; author: string; body: string; created_at: Date }): InquiryMessage => ({
+  id: Number(r.id), sender: r.sender, author: r.author, body: r.body, createdAt: new Date(r.created_at).toISOString(),
+});
+
+export async function listInquiryMessages(id: number) {
+  const rows = await sql<{ id: number; sender: "customer" | "admin"; author: string; body: string; created_at: Date }>(
+    "select id, sender, author, body, created_at from inquiry_messages where inquiry_id = $1 order by created_at, id", [id]);
+  return rows.map(messageMap);
+}
+
+export async function getCustomerConversation(id: number, token: string) {
+  const tokenHash = fingerprint("inquiry-chat", token);
+  const inquiry = await one<Row>("select i.*, p.slug from inquiries i left join products p on p.id = i.product_id where i.id = $1 and i.customer_token_hash = $2", [id, tokenHash]);
+  if (!inquiry) return null;
+  await sql("update inquiries set customer_last_read_at = now() where id = $1", [id]);
+  return { inquiry: map(inquiry), messages: await listInquiryMessages(id) };
+}
+
+export async function addCustomerMessage(id: number, token: string, body: string) {
+  const tokenHash = fingerprint("inquiry-chat", token);
+  const inquiry = await one<{ id: number; name: string; product_name: string; email: string }>("select id, name, product_name, email from inquiries where id = $1 and customer_token_hash = $2", [id, tokenHash]);
+  if (!inquiry) return null;
+  await tx(async (q) => {
+    await q.query("insert into inquiry_messages (inquiry_id, sender, author, body) values ($1,'customer',$2,$3)", [id, inquiry.name, body]);
+    await q.query("update inquiries set status = case when status = 'closed' then 'new' else 'in_progress' end, updated_at = now(), customer_last_read_at = now() where id = $1", [id]);
+  });
+  return inquiry;
+}
+
+export async function addAdminMessage(admin: Admin, id: number, body: string) {
+  const inquiry = await getInquiry(id);
+  if (!inquiry) throw new Error("Conversation not found.");
+  await tx(async (q) => {
+    await q.query("insert into inquiry_messages (inquiry_id, sender, author, body) values ($1,'admin',$2,$3)", [id, admin.name || "MAVERICK", body]);
+    await q.query("update inquiries set status = 'answered', updated_at = now(), admin_last_read_at = now() where id = $1", [id]);
+  });
+  await logActivity(admin, "inquiry_reply", "inquiry", String(id));
+  return inquiry;
 }

@@ -19,8 +19,8 @@ export function ProductGallery({ product }: { product: Product }) {
   const [i, setI] = React.useState(0);
   const view = views[i] ?? views[0]!;
   return (
-    <div className="flex flex-col-reverse gap-3 md:flex-row">
-      <ul className="flex gap-2 overflow-x-auto md:flex-col" aria-label="Product views">
+    <div className="flex min-w-0 flex-col-reverse gap-3 md:flex-row">
+      <ul className="min-w-0 max-w-full flex gap-2 overflow-x-auto md:flex-col" aria-label="Product views">
         {views.map((v, k) => (
           <li key={`${v.src}-${k}`} className="shrink-0">
             <button type="button" aria-label={`Show ${v.alt}`} aria-pressed={k === i} onClick={() => setI(k)} className={`relative block w-[72px] border-2 bg-studio focus-visible:outline-2 focus-visible:outline-ring ${k === i ? "border-foreground" : "border-transparent hover:border-foreground/30"}`} style={{ aspectRatio: "4 / 5" }}>

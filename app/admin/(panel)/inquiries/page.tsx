@@ -2,12 +2,12 @@ import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/server/admin";
-import { getInquiry, INQUIRY_LABELS, listInquiries } from "@/lib/server/inquiries";
+import { getInquiry, INQUIRY_LABELS, listInquiries, listInquiryMessages } from "@/lib/server/inquiries";
 import { sql } from "@/lib/server/db";
 import { normalisePhone } from "@/lib/site";
 import { AdminLoading, Empty, Flash, InquiryPill, PageHead, when } from "@/components/admin/ui";
 import { Submit } from "@/components/admin/submit";
-import { saveInquiry } from "../../actions";
+import { replyInquiry, saveInquiry } from "../../actions";
 
 export const metadata: Metadata = { title: "Inquiries" };
 
@@ -24,12 +24,13 @@ async function Body({ sp: spP }: { sp: PageProps<"/admin/inquiries">["searchPara
   const [rows, products] = await Promise.all([listInquiries(f), sql<{ id: number; name: string; colour_label: string }>("select id, name, colour_label from products order by sort, id")]);
   const openId = Number(s(sp.id)) || rows[0]?.id || 0;
   const open = openId ? await getInquiry(openId) : null;
+  const messages = open ? await listInquiryMessages(open.id) : [];
   const keep = new URLSearchParams(Object.entries(f).filter(([, v]) => v));
   const link = (id: number) => `/admin/inquiries?${new URLSearchParams({ ...Object.fromEntries(keep), id: String(id) })}`;
 
   return (
     <>
-      <PageHead code="07 / Inquiries" title="Inquiries" intro="Questions customers sent from product pages. Separate from orders. Reply by email or WhatsApp, then mark it answered." />
+      <PageHead code="07 / Conversations" title="Conversations" intro="Chat directly with customers about products, sizing, fit and delivery." />
       <Flash sp={sp} />
       <form className="mb-6 grid gap-3 bg-paper p-4 sm:grid-cols-[2fr_1fr_1fr_auto]" role="search">
         <div className="field"><label htmlFor="q">Search</label><input id="q" name="q" defaultValue={f.q} placeholder="Name, email, phone or message" /></div>
@@ -38,9 +39,9 @@ async function Body({ sp: spP }: { sp: PageProps<"/admin/inquiries">["searchPara
         <div className="flex items-end gap-2"><button className="btn" type="submit">Filter</button><Link href="/admin/inquiries" className="btn-ghost">Clear</Link></div>
       </form>
 
-      {rows.length === 0 ? <Empty title="No inquiries">Questions from the &ldquo;Ask about this product&rdquo; form land here.</Empty> : (
+      {rows.length === 0 ? <Empty title="No conversations">Product chats from customers land here.</Empty> : (
         <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
-          <ul className="flex max-h-[75vh] flex-col overflow-y-auto bg-paper" aria-label="Inquiries">
+          <ul className="flex max-h-[75vh] flex-col overflow-y-auto bg-paper" aria-label="Conversations">
             {rows.map((r) => (
               <li key={r.id}>
                 <Link href={link(r.id)} aria-current={r.id === openId ? "true" : undefined} className={`flex flex-col gap-1 border-b border-border px-4 py-3 text-sm ${r.id === openId ? "bg-ink text-paper" : "hover:bg-background"}`}>
@@ -64,11 +65,19 @@ async function Body({ sp: spP }: { sp: PageProps<"/admin/inquiries">["searchPara
                 <div><dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Product</dt><dd>{open.productSlug ? <Link className="underline" href={`/products/${open.productSlug}`} target="_blank">{open.productName}</Link> : open.productName || "General"}</dd></div>
                 <div><dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Size / colour</dt><dd>{[open.size, open.colour].filter(Boolean).join(" · ") || "—"}</dd></div>
               </dl>
-              <blockquote className="whitespace-pre-wrap border-l-4 border-foreground bg-background p-4 text-[15px] leading-relaxed">{open.message}</blockquote>
-              <div className="flex flex-wrap gap-2">
-                <a className="btn btn-sm" href={`mailto:${open.email}?subject=${encodeURIComponent(`Re: ${open.productName || "your question"}`)}&body=${encodeURIComponent(`Hi ${open.name.split(" ")[0]},\n\n`)}`}>Reply by email</a>
-                {open.phone && <a className="btn btn-sm bg-[#25D366] text-ink" target="_blank" rel="noopener noreferrer" href={`https://wa.me/${normalisePhone(open.phone)}?text=${encodeURIComponent(`Hi ${open.name.split(" ")[0]}, it's MAVERICK about your question on the ${open.productName || "website"}.`)}`}>Reply on WhatsApp</a>}
-              </div>
+              <section aria-label="Conversation" className="flex max-h-[440px] flex-col gap-2 overflow-y-auto border-y-2 border-foreground bg-paper p-3">
+                {messages.map((m) => <div key={m.id} className={`max-w-[90%] px-3 py-2 text-sm ${m.sender === "admin" ? "ml-auto bg-accent-blue text-paper" : "mr-auto border-l-4 border-foreground bg-background"}`}>
+                  <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] opacity-65">{m.sender === "admin" ? "Maverick · Owner" : open.name}</p>
+                  <p className="mt-1 whitespace-pre-wrap leading-relaxed">{m.body}</p><p className="mt-1 text-[9px] opacity-60">{when(m.createdAt)}</p>
+                </div>)}
+              </section>
+              <form action={replyInquiry} className="flex flex-col gap-2">
+                <input type="hidden" name="id" value={open.id} /><input type="hidden" name="back" value={link(open.id)} />
+                <label className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" htmlFor="reply-message">Reply to customer</label>
+                <textarea id="reply-message" name="message" rows={4} maxLength={3000} required placeholder="Type your reply" />
+                <Submit className="btn self-end">Send reply</Submit>
+              </form>
+              <div className="flex flex-wrap gap-2"><a className="btn-ghost text-xs" href={`mailto:${open.email}`}>Email</a>{open.phone && <a className="btn-ghost text-xs" target="_blank" rel="noopener noreferrer" href={`https://wa.me/${normalisePhone(open.phone)}`}>WhatsApp</a>}</div>
               <form action={saveInquiry} className="flex flex-col gap-3 border-t border-border pt-4">
                 <input type="hidden" name="id" value={open.id} /><input type="hidden" name="back" value={link(open.id)} />
                 <div className="field"><label htmlFor="inq-status">Status</label><select id="inq-status" name="status" defaultValue={open.status}>{Object.entries(INQUIRY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
