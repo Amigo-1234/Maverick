@@ -1,6 +1,7 @@
 import { addCustomerMessage, getCustomerConversation } from "@/lib/server/inquiries";
 import { inquiryFollowUpEmail, notifyShop } from "@/lib/server/email";
 import { clientIp, rateLimit } from "@/lib/server/security";
+import { sendPush } from "@/lib/server/push";
 
 const credentials = async (request: Request, idText: string) => {
   const id = Number(idText);
@@ -33,5 +34,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/inquiries/[
   if (!inquiry) return Response.json({ error: "Conversation not found." }, { status: 404 });
   const mail = inquiryFollowUpEmail({ id, name: inquiry.name, product: inquiry.product_name, message });
   await notifyShop(mail.subject, mail.html, inquiry.email).catch((e) => console.error("[chat email]", e));
+  await sendPush("admin", null, { title: `Message from ${inquiry.name}`, body: message.slice(0, 140), url: `/admin/inquiries?id=${id}`, tag: `inquiry-${id}` }).catch((e) => console.error("[chat push]", e));
   return Response.json({ ok: true });
 }

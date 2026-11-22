@@ -8,6 +8,7 @@ import { normalisePhone } from "@/lib/site";
 import { AdminLoading, Empty, Flash, InquiryPill, PageHead, when } from "@/components/admin/ui";
 import { Submit } from "@/components/admin/submit";
 import { replyInquiry, saveInquiry } from "../../actions";
+import { PushNotifications } from "@/components/push-notifications";
 
 export const metadata: Metadata = { title: "Inquiries" };
 
@@ -30,7 +31,7 @@ async function Body({ sp: spP }: { sp: PageProps<"/admin/inquiries">["searchPara
 
   return (
     <>
-      <PageHead code="07 / Conversations" title="Conversations" intro="Chat directly with customers about products, sizing, fit and delivery." />
+      <PageHead code="07 / Conversations" title="Conversations" intro="Chat directly with customers about products, sizing, fit and delivery." actions={<PushNotifications audience="admin" />} />
       <Flash sp={sp} />
       <form className="mb-6 grid gap-3 bg-paper p-4 sm:grid-cols-[2fr_1fr_1fr_auto]" role="search">
         <div className="field"><label htmlFor="q">Search</label><input id="q" name="q" defaultValue={f.q} placeholder="Name, email, phone or message" /></div>

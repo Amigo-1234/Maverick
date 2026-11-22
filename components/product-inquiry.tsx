@@ -4,6 +4,7 @@ import * as React from "react";
 import type { Product } from "@/lib/catalog";
 import { ChevronDownIcon, WhatsAppIcon } from "./icons";
 import { useSettings, useWhatsApp } from "./store-provider";
+import { PushNotifications } from "./push-notifications";
 
 export function inquiryWhatsAppText(o: { store: string; name: string; colour: string; url: string; size?: string | null; question?: string }) {
   return [`Hi ${o.store}, I have a question about the ${o.name}.`, `Product: ${o.url}`, o.size ? `Size: ${o.size}` : "", o.colour ? `Colour: ${o.colour}` : "", o.question?.trim() ? `Question: ${o.question.trim()}` : ""].filter(Boolean).join("\n");
@@ -23,6 +24,7 @@ export function ProductInquiry({ product, size, colour }: { product: Product; si
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const endRef = React.useRef<HTMLDivElement>(null);
+  const sectionRef = React.useRef<HTMLElement>(null);
   const url = typeof window === "undefined" ? `/products/${product.slug}` : `${window.location.origin}/products/${product.slug}`;
   const waHref = wa(inquiryWhatsAppText({ store: settings.name, name: product.name, colour, url, size, question: draft }));
 
@@ -66,7 +68,10 @@ export function ProductInquiry({ product, size, colour }: { product: Product; si
     finally { setBusy(false); }
   };
 
-  return <section className="min-w-0 border-t border-border pt-3 [&_.field]:min-w-0 [&_input]:min-w-0 [&_textarea]:min-w-0">
+  const reveal = () => { setMode("chat"); setOpen(true); window.setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
+
+  return <section ref={sectionRef} className="min-w-0 scroll-mt-24 border-t border-border pt-3 [&_.field]:min-w-0 [&_input]:min-w-0 [&_textarea]:min-w-0">
+    <button type="button" onClick={reveal} aria-label="Open MAVERICK product chat" className={`${open ? "hidden" : "fixed"} bottom-[max(16px,calc(env(safe-area-inset-bottom,0px)+16px))] left-[max(16px,calc(env(safe-area-inset-left,0px)+16px))] z-50 bg-accent-blue px-4 py-3 text-[12px] font-bold uppercase tracking-[0.16em] text-paper shadow-[0_8px_24px_rgb(0_0_0/0.28)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}>Ask Maverick <span aria-hidden="true">→</span></button>
     <button type="button" aria-expanded={open} aria-controls="ask-panel" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between py-1 text-[12px] font-semibold uppercase tracking-[0.16em] hover:text-accent-blue">
       Chat about this product <ChevronDownIcon size={18} className={`transition-transform ${open ? "rotate-180" : ""}`} />
     </button>
@@ -81,6 +86,7 @@ export function ProductInquiry({ product, size, colour }: { product: Product; si
       : key ? <div className="flex flex-col gap-3">
         <div className="max-h-[360px] min-h-40 space-y-2 overflow-y-auto border border-border bg-paper p-3" aria-live="polite">{messages.map((m) => <div key={m.id} className={`max-w-[90%] px-3 py-2 text-sm ${m.sender === "admin" ? "mr-auto border-l-4 border-accent-red bg-background" : "ml-auto bg-accent-blue text-paper"}`}><p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.14em] opacity-70">{m.sender === "admin" ? "Maverick · Owner" : "You"}</p><p className="whitespace-pre-wrap leading-relaxed">{m.body}</p><time className="mt-1 block text-[9px] opacity-60">{new Date(m.createdAt).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}</time></div>)}<div ref={endRef} /></div>
         <form onSubmit={send} className="flex flex-col gap-2"><label htmlFor="chat-message" className="sr-only">Type your message</label><textarea id="chat-message" rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={3000} required placeholder="Type your message" />{error && <p role="alert" className="border-l-4 border-accent-red bg-paper px-3 py-2 text-sm">{error}</p>}<button className="btn" disabled={busy || !draft.trim()}>{busy ? "Sending…" : "Send message"}</button></form>
+        <PushNotifications audience="customer" inquiryId={key.id} token={key.token} compact />
       </div> : <form onSubmit={start} className="grid gap-3 sm:grid-cols-2">
         <div className="field"><label htmlFor="chat-name">Name</label><input id="chat-name" name="name" required autoComplete="name" /></div><div className="field"><label htmlFor="chat-email">Email</label><input id="chat-email" name="email" type="email" required autoComplete="email" /></div>
         <div className="field sm:col-span-2"><label htmlFor="chat-phone">Phone (optional)</label><input id="chat-phone" name="phone" type="tel" autoComplete="tel" /></div><div className="field sm:col-span-2"><label htmlFor="chat-first">Your question</label><textarea id="chat-first" name="message" rows={4} required minLength={3} placeholder="Ask about sizing, fit, fabric or delivery" /></div>

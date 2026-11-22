@@ -2,6 +2,7 @@ import { validEmail } from "@/lib/order";
 import { createInquiry } from "@/lib/server/inquiries";
 import { inquiryAlertEmail, notifyShop } from "@/lib/server/email";
 import { clientIp, rateLimit } from "@/lib/server/security";
+import { sendPush } from "@/lib/server/push";
 
 /** "Ask about this product": saves the question, then emails the shop. */
 export async function POST(request: Request) {
@@ -21,5 +22,6 @@ export async function POST(request: Request) {
 
   const m = inquiryAlertEmail({ ...data, product: saved.productName, id: saved.id });
   await notifyShop(m.subject, m.html, data.email).catch((e) => console.error("[inquiry email]", e)); // saved either way
+  await sendPush("admin", null, { title: `New message from ${data.name}`, body: `${saved.productName || "Product question"}: ${data.message.slice(0, 120)}`, url: `/admin/inquiries?id=${saved.id}`, tag: `inquiry-${saved.id}` }).catch((e) => console.error("[inquiry push]", e));
   return Response.json({ ok: true, id: saved.id, token: saved.token });
 }

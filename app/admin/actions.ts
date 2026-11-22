@@ -15,6 +15,7 @@ import { inquiryReplyEmail, refundEmail, sendEmail } from "@/lib/server/email";
 import { addAdminMessage, updateInquiry, type InquiryStatus } from "@/lib/server/inquiries";
 import { CATALOG_TAG } from "@/lib/server/store";
 import type { FulfilmentStatus } from "@/lib/order";
+import { sendPush } from "@/lib/server/push";
 
 const str = (f: FormData, k: string, max = 2000) => String(f.get(k) ?? "").trim().slice(0, max);
 const num = (f: FormData, k: string) => Math.round(Number(f.get(k) ?? NaN));
@@ -208,6 +209,7 @@ export async function replyInquiry(f: FormData) {
   if (!message) go(`/admin/inquiries?id=${id}`, "error", "Type a reply first.");
   return run(backTo(f, `/admin/inquiries?id=${id}`), async () => {
     const inquiry = await addAdminMessage(admin, id, message);
+    await sendPush("customer", id, { title: "MAVERICK replied", body: message.slice(0, 140), url: inquiry.productSlug ? `/products/${inquiry.productSlug}` : "/", tag: `inquiry-${id}` }).catch((e) => console.error("[chat reply push]", e));
     if (emailReady()) {
       const mail = inquiryReplyEmail({ id, name: inquiry.name, product: inquiry.productName, message });
       await sendEmail({ to: inquiry.email, subject: mail.subject, html: mail.html }).catch((e) => console.error("[chat reply email]", e));

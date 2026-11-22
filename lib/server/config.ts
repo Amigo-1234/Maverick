@@ -20,6 +20,11 @@ export const config = {
     ordersTo: env("ORDER_NOTIFY_EMAIL"),
     audienceId: env("RESEND_AUDIENCE_ID"),
   },
+  push: {
+    publicKey: env("NEXT_PUBLIC_VAPID_PUBLIC_KEY"),
+    privateKey: env("VAPID_PRIVATE_KEY"),
+    subject: env("VAPID_SUBJECT") ?? `mailto:${env("ORDER_NOTIFY_EMAIL") ?? "hello@example.com"}`,
+  },
   /** First owner account, created on the first sign-in when no admin exists yet. */
   bootstrapAdmin: { email: env("ADMIN_EMAIL")?.toLowerCase(), password: env("ADMIN_PASSWORD") },
   /** Minutes a checkout holds stock while the customer pays. */
@@ -28,4 +33,5 @@ export const config = {
 
 export const paymentsReady = () => Boolean(config.paystack.secretKey);
 export const emailReady = () => Boolean(config.email.resendKey && config.email.from);
+export const pushReady = () => Boolean(config.push.publicKey && config.push.privateKey);
 export const isProduction = () => process.env.NODE_ENV === "production" && !config.siteUrl.includes("localhost");
