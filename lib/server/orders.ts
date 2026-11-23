@@ -13,6 +13,7 @@ import { readSettings, readZones } from "./store";
 import { deliveryFee, normalisePhone, zonesForState } from "../site";
 import type { Admin } from "./admin";
 import { logActivity } from "./admin";
+import { confirmedPrice } from "./catalog-prices";
 import {
   FULFILMENT_LABELS, NEEDS_PAYMENT, type CartLine, type Customer, type FulfilmentStatus, type OrderView, type PaymentStatus,
 } from "../order";
@@ -51,7 +52,8 @@ export async function priceBag(q: Q, lines: CartLine[], opts: { state?: string; 
     const v = rows.find((r) => r.slug === l.slug && r.size === String(l.size) && (!l.colour || r.colour === l.colour));
     if (!v || v.status !== "published") throw new OrderError("A piece in your bag is no longer available.");
     if (!Number.isInteger(qty) || qty < 1 || qty > 10) throw new OrderError(`Check the quantity for ${v.name}.`);
-    return { variantId: v.variant_id, productId: v.product_id, slug: v.slug, code: v.code, name: v.name, colour: v.colour || v.colour_label, size: v.size, qty, unitPrice: v.price, total: v.price * qty, image: v.front_tight ?? v.front, stock: v.stock };
+    const unitPrice = confirmedPrice(v.slug, v.price);
+    return { variantId: v.variant_id, productId: v.product_id, slug: v.slug, code: v.code, name: v.name, colour: v.colour || v.colour_label, size: v.size, qty, unitPrice, total: unitPrice * qty, image: v.front_tight ?? v.front, stock: v.stock };
   });
   // Stock check on the combined quantity per variant (final enforcement happens in reserveStock).
   const want = new Map<number, number>();

@@ -4,6 +4,7 @@ import { sql, type Q } from "./db";
 import type { Catalog, CollectionInfo, Product } from "../catalog";
 import { SIZE_ORDER } from "../catalog";
 import { DEFAULT_SETTINGS, type DeliveryZone, type PrivateSettings, type StoreSettings } from "../site";
+import { confirmedPrice } from "./catalog-prices";
 
 export const CATALOG_TAG = "catalog";
 
@@ -43,7 +44,7 @@ export async function loadProducts(opts: { includeUnpublished?: boolean; ids?: n
     return {
       id: r.id, slug: r.slug, code: r.code, name: r.name, colour: r.colour_label || colours.join(" / "),
       category: r.category ?? "", categoryTitle: r.category_title ?? "",
-      price: r.price, compareAt: r.compare_at && r.compare_at > r.price ? r.compare_at : null,
+      price: confirmedPrice(r.slug, r.price), compareAt: r.compare_at && r.compare_at > confirmedPrice(r.slug, r.price) ? r.compare_at : null,
       sizes, colours, variants: vs, isNew: r.is_new, featured: r.featured,
       front, frontTight: r.front_tight ?? front, back: r.back ?? undefined, backTight: r.back_tight ?? r.back ?? undefined, side: r.side ?? undefined,
       photos: images.filter((i) => i.product_id === r.id).map((i) => ({ src: i.url, alt: i.alt || r.name })),
