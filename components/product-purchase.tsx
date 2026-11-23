@@ -49,7 +49,7 @@ export function AddToBag({ product }: { product: Product }) {
   const wa = useWhatsApp();
   const multiColour = product.colours.length > 1;
   const [colour, setColour] = React.useState<string | undefined>(multiColour ? product.colours[0] : undefined);
-  const [size, setSize] = React.useState<string | null>(null);
+  const [size, setSize] = React.useState<string | null>(() => inStock(product, "XL", multiColour ? product.colours[0] : undefined) ? "XL" : null);
   const [error, setError] = React.useState(false);
   const variant = size ? variantFor(product, size, colour) : null;
   const soldOutEverywhere = product.variants.every((v) => v.stock <= 0);
@@ -61,7 +61,7 @@ export function AddToBag({ product }: { product: Product }) {
           <legend className="mb-2 text-[12px] font-semibold uppercase tracking-[0.16em]">Colour <span className="text-muted-foreground">— {colour}</span></legend>
           <div className="flex flex-wrap gap-2">
             {product.colours.map((c) => (
-              <button key={c} type="button" aria-pressed={colour === c} onClick={() => { setColour(c); setSize(null); }} className={`cut-sm px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.1em] ${colour === c ? "bg-foreground text-background" : "ring-1 ring-inset ring-foreground/20 hover:ring-foreground"}`}>{c}</button>
+              <button key={c} type="button" aria-pressed={colour === c} onClick={() => { setColour(c); setSize(inStock(product, "XL", c) ? "XL" : null); }} className={`cut-sm px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.1em] ${colour === c ? "bg-foreground text-background" : "ring-1 ring-inset ring-foreground/20 hover:ring-foreground"}`}>{c}</button>
             ))}
           </div>
         </fieldset>
@@ -79,6 +79,7 @@ export function AddToBag({ product }: { product: Product }) {
             );
           })}
         </div>
+        <p className="text-[13px] font-semibold text-accent-blue">Only XL is available for now.</p>
         {variant && variant.stock > 0 && variant.stock <= variant.lowStockAt && <p className="text-[13px] font-semibold text-accent-red">Only {variant.stock} left in {size}.</p>}
         {error && <p role="alert" className="text-[13px] font-semibold text-accent-red">Choose a size first.</p>}
       </fieldset>
