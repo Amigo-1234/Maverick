@@ -10,3 +10,4 @@ create table push_subscriptions (
   check ((audience = 'admin' and inquiry_id is null) or (audience = 'customer' and inquiry_id is not null))
 );
 create index push_subscriptions_audience on push_subscriptions (audience, inquiry_id);
+alter table push_subscriptions enable row level security;

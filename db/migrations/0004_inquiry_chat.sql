@@ -12,6 +12,7 @@ create table inquiry_messages (
   created_at  timestamptz not null default now()
 );
 create index inquiry_messages_thread on inquiry_messages (inquiry_id, created_at, id);
+alter table inquiry_messages enable row level security;
 
 -- Preserve every existing inquiry as the first message in its conversation.
 insert into inquiry_messages (inquiry_id, sender, author, body, created_at)

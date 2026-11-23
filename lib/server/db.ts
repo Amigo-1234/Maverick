@@ -1,6 +1,6 @@
 /**
  * Database access (server only).
- *  - DATABASE_URL set   → PostgreSQL (Supabase in production) through node-postgres.
+ *  - DATABASE_URL set   → PostgreSQL (managed provider in production) through node-postgres.
  *                          Run `npm run db:migrate` to apply migrations.
  *  - DATABASE_URL unset → PGlite, an embedded PostgreSQL stored in .data/pglite (local dev and tests).
  *                          Migrations are applied automatically.
