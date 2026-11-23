@@ -9,6 +9,7 @@ import { addSubscriber, lowStockEmail, notifyShop, orderAlertEmail, receiptEmail
 import { emailReady } from "./config";
 import { readSettings, CATALOG_TAG } from "./store";
 import { sql } from "./db";
+import { sendPush } from "./push";
 import type { FulfilmentStatus } from "../order";
 
 export type PaymentOutcome =
@@ -52,6 +53,12 @@ async function afterPaid(orderId: string) {
   const o = await orderById(orderId);
   if (!o) return;
   const settings = await readSettings();
+  await sendPush("admin", null, {
+    title: `New paid order ${o.number}`,
+    body: `${o.firstName} ${o.lastName} · ₦${o.total.toLocaleString("en-NG")} · ${o.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}`,
+    url: `/admin/orders/${o.id}`,
+    tag: `paid-order-${o.id}`,
+  }).catch(warn("order-push"));
   if (!emailReady()) { console.warn("[order] paid", o.number, "but email isn't set up"); return; }
   const alert = orderAlertEmail(o);
   const receipt = receiptEmail(o, settings.whatsappDisplay);

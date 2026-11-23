@@ -50,7 +50,7 @@ export function CartDrawer() {
                 <span className="uppercase tracking-[0.14em]">Subtotal</span>
                 <span className="price text-base tabular-nums">{formatPrice(subtotal)}</span>
               </div>
-              <p className="text-[12px] text-muted-foreground">Delivery is calculated at checkout.</p>
+              <p className="text-[12px] text-muted-foreground">Delivery is arranged separately on WhatsApp.</p>
               <Link href="/checkout" onClick={() => setOpen(false)} className="btn w-full">Checkout</Link>
               <Link href="/cart" onClick={() => setOpen(false)} className="btn-ghost w-full">View bag</Link>
             </footer>

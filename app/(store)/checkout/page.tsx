@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useCart } from "@/components/cart/cart-context";
 import { ShieldIcon } from "@/components/icons";
 import { useStore, useWhatsApp } from "@/components/store-provider";
-import { NIGERIAN_STATES, deliveryFee, formatPrice, zonesForState } from "@/lib/site";
+import { NIGERIAN_STATES, formatPrice, zonesForState } from "@/lib/site";
 import { track } from "@/lib/track";
 
 const DRAFT_KEY = "maverick-checkout-draft";
-const FIELDS = ["email", "firstName", "lastName", "address1", "address2", "city", "state", "postcode", "country", "phone"] as const;
+const FIELDS = ["email", "firstName", "lastName", "address1", "address2", "city", "state", "country", "phone"] as const;
 type Quote = { subtotal: number; discount: { code: string; amount: number } | null; delivery: { zoneId: number; fee: number } | null; total: number };
 
 export default function CheckoutPage() {
@@ -72,8 +72,7 @@ export default function CheckoutPage() {
 
   // Shown immediately; replaced by the server's quote as soon as it arrives.
   const discount = quote?.discount?.amount ?? 0;
-  const fee = quote?.delivery?.fee ?? (zone ? deliveryFee(zone, subtotal - discount, settings.freeDeliveryOver) : 0);
-  const total = quote?.total ?? subtotal - discount + fee;
+  const total = quote?.total ?? subtotal - discount;
   const unavailable = items.some((i) => i.qty > i.available);
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -120,7 +119,6 @@ export default function CheckoutPage() {
             <div className="field"><label htmlFor="state">State</label>
               <select id="state" name="state" required value={state} onChange={(e) => { setState(e.target.value); setZoneId(null); }} autoComplete="address-level1">{NIGERIAN_STATES.map((st) => <option key={st}>{st}</option>)}</select>
             </div>
-            <div className="field"><label htmlFor="postcode">Postal code (optional)</label><input id="postcode" name="postcode" autoComplete="postal-code" /></div>
             <div className="field"><label htmlFor="country">Country</label><select id="country" name="country" defaultValue="Nigeria" autoComplete="country-name"><option>Nigeria</option></select></div>
             <div className="field sm:col-span-2"><label htmlFor="phone">Phone number (for the rider)</label><input id="phone" name="phone" type="tel" required placeholder="0803 000 0000" autoComplete="tel" /></div>
           </fieldset>
@@ -128,14 +126,13 @@ export default function CheckoutPage() {
             <legend className="mb-4 font-display text-3xl uppercase">3. Delivery method</legend>
             {options.length === 0 && <p className="text-sm text-accent-red">We don&apos;t deliver to {state} yet. <a className="underline" href={wa(`Hi ${settings.name}, do you deliver to ${state}?`)} target="_blank" rel="noopener noreferrer">Ask on WhatsApp</a></p>}
             {options.map((z) => {
-              const price = deliveryFee(z, subtotal - discount, settings.freeDeliveryOver);
               return (
                 <label key={z.id} htmlFor={`zone-${z.id}`} className={`flex cursor-pointer items-center justify-between gap-4 border-[1.5px] px-4 py-4 ${zone?.id === z.id ? "border-foreground bg-paper" : "border-foreground/20"}`}>
                   <span className="flex items-center gap-3">
                     <input id={`zone-${z.id}`} type="radio" name="zone" value={z.id} checked={zone?.id === z.id} onChange={() => setZoneId(z.id)} className="size-4 accent-[var(--ink)]" />
                     <span><span className="block font-semibold">{z.name}</span><span className="text-[13px] text-muted-foreground">{z.eta}{z.instructions ? ` · ${z.instructions}` : ""}</span></span>
                   </span>
-                  <span className="price text-sm">{price === 0 ? "Free" : formatPrice(price)}</span>
+                  <span className="text-right text-xs font-semibold uppercase tracking-[0.08em]">Discuss on WhatsApp</span>
                 </label>
               );
             })}
@@ -182,7 +179,7 @@ export default function CheckoutPage() {
           <dl className="flex flex-col gap-2 border-t border-border pt-4 text-sm">
             <div className="flex justify-between"><dt>Subtotal</dt><dd className="price">{formatPrice(quote?.subtotal ?? subtotal)}</dd></div>
             {discount > 0 && <div className="flex justify-between text-accent-blue"><dt>Discount</dt><dd className="price">−{formatPrice(discount)}</dd></div>}
-            <div className="flex justify-between"><dt>Delivery</dt><dd className="price">{fee === 0 ? "Free" : formatPrice(fee)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Delivery</dt><dd className="text-right font-semibold">Arranged on WhatsApp</dd></div>
             <div className="flex justify-between border-t border-border pt-3 text-base font-semibold"><dt className="uppercase tracking-[0.1em]">Total</dt><dd className="price" data-testid="checkout-total">{formatPrice(total)}</dd></div>
           </dl>
           {error && (
