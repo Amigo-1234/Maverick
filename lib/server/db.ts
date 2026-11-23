@@ -1,7 +1,7 @@
 /**
  * Database access (server only).
  *  - DATABASE_URL set   → PostgreSQL (managed provider in production) through node-postgres.
- *                          Run `npm run db:migrate` to apply migrations.
+ *                          Pending migrations are applied once at startup under an advisory lock.
  *  - DATABASE_URL unset → PGlite, an embedded PostgreSQL stored in .data/pglite (local dev and tests).
  *                          Migrations are applied automatically.
  * The same SQL runs on both.
@@ -20,6 +20,27 @@ async function pgDriver(url: string): Promise<Driver> {
   const local = /localhost|127\.0\.0\.1/.test(url);
   const pool = new Pool({ connectionString: url, max: Number(process.env.DATABASE_POOL_MAX ?? 5), ssl: local ? false : { rejectUnauthorized: false } });
   const run = async <T>(c: { query: (t: string, p?: unknown[]) => Promise<{ rows: unknown[] }> }, text: string, params?: unknown[]) => (await c.query(text, params)).rows as T[];
+  const migrator = await pool.connect();
+  try {
+    await migrator.query("select pg_advisory_lock(727001)");
+    await migrator.query("create table if not exists schema_migrations (name text primary key, applied_at timestamptz not null default now())");
+    const done = new Set((await migrator.query<{ name: string }>("select name from schema_migrations")).rows.map((r) => r.name));
+    for (const migration of MIGRATIONS) {
+      if (done.has(migration.name)) continue;
+      await migrator.query("begin");
+      try {
+        await migrator.query(migration.sql);
+        await migrator.query("insert into schema_migrations (name) values ($1)", [migration.name]);
+        await migrator.query("commit");
+      } catch (error) {
+        await migrator.query("rollback").catch(() => {});
+        throw new Error(`${migration.name} failed`, { cause: error });
+      }
+    }
+  } finally {
+    await migrator.query("select pg_advisory_unlock(727001)").catch(() => {});
+    migrator.release();
+  }
   return {
     query: (text, params) => run(pool, text, params),
     async tx(fn) {
