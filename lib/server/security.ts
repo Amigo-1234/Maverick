@@ -27,6 +27,12 @@ export async function rateLimit(bucket: string, id: string, max: number, windowS
   return (row?.count ?? 1) <= max;
 }
 
+/** Gives an attempt back when the protected operation fails for a server-side reason. */
+export async function refundRateLimit(bucket: string, id: string) {
+  const key = `${bucket}:${fingerprint(id)}`;
+  await one("update rate_limits set count = greatest(count - 1, 0) where key = $1 returning count", [key]);
+}
+
 /** Token that lets an email link open one order's tracking page without typing details. */
 export const trackingToken = (orderNumber: string) => createHmac("sha256", config.appSecret).update(`track:${orderNumber}`).digest("hex").slice(0, 32);
 

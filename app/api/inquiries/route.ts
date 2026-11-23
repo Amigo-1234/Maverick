@@ -1,7 +1,7 @@
 import { validEmail } from "@/lib/order";
 import { createInquiry } from "@/lib/server/inquiries";
 import { inquiryAlertEmail, notifyShop } from "@/lib/server/email";
-import { clientIp, rateLimit } from "@/lib/server/security";
+import { clientIp, rateLimit, refundRateLimit } from "@/lib/server/security";
 import { sendPush } from "@/lib/server/push";
 
 /** "Ask about this product": saves the question, then emails the shop. */
@@ -14,10 +14,20 @@ export async function POST(request: Request) {
   if (!data.name || !validEmail(data.email) || data.message.length < 3) return Response.json({ error: "Add your name, a valid email and your question." }, { status: 422 });
 
   const ip = await clientIp(request);
-  if (!(await rateLimit("inquiry-ip", ip, 6, 3600)) || !(await rateLimit("inquiry-email", data.email, 4, 3600))) {
+  const ipBucket = "inquiry-v2-ip", emailBucket = "inquiry-v2-email";
+  const ipAllowed = await rateLimit(ipBucket, ip, 8, 3600);
+  const emailAllowed = ipAllowed && await rateLimit(emailBucket, data.email, 6, 3600);
+  if (!ipAllowed || !emailAllowed) {
     return Response.json({ error: "You've sent a few questions already. We'll reply soon, or WhatsApp us for a faster answer." }, { status: 429 });
   }
-  const saved = await createInquiry(data);
+  let saved: Awaited<ReturnType<typeof createInquiry>>;
+  try {
+    saved = await createInquiry(data);
+  } catch (error) {
+    await Promise.all([refundRateLimit(ipBucket, ip), refundRateLimit(emailBucket, data.email)]).catch(() => {});
+    console.error("[inquiry create]", error);
+    return Response.json({ error: "We couldn't start the chat just now. Please try again." }, { status: 503 });
+  }
   if (saved.duplicate) return Response.json({ error: "We've already got this question from you. We'll reply soon." }, { status: 409 });
 
   const m = inquiryAlertEmail({ ...data, product: saved.productName, id: saved.id });
