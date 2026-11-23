@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/site";
 import { AdminLoading, BarChart, Empty, Flash, FulfilmentPill, InquiryPill, Money, PageHead, PaymentPill, Stat, when } from "@/components/admin/ui";
 import type { FulfilmentStatus, PaymentStatus } from "@/lib/order";
 import type { InquiryStatus } from "@/lib/server/inquiries";
+import { PushNotifications } from "@/components/push-notifications";
 
 export default function Overview(props: PageProps<"/admin">) {
   return <Suspense fallback={<AdminLoading />}><Body sp={props.searchParams} /></Suspense>;
@@ -36,6 +37,14 @@ async function Body({ sp: spP }: { sp: PageProps<"/admin">["searchParams"] }) {
           </form>
         } />
       <Flash sp={sp} />
+
+      <section className="mb-6 flex flex-col gap-3 border-l-4 border-accent-blue bg-paper p-4 sm:flex-row sm:items-center sm:justify-between" aria-labelledby="admin-app-title">
+        <div>
+          <h2 id="admin-app-title" className="font-display text-2xl uppercase">Install the admin app</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Add this dashboard to the owner&apos;s Home Screen, then enable alerts for new customer messages.</p>
+        </div>
+        <PushNotifications audience="admin" />
+      </section>
 
       <section aria-label="Sales" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat tone="ink" label="Revenue (net)" value={formatPrice(d.net)} note={d.money.refunds ? `${formatPrice(d.money.gross)} paid − ${formatPrice(d.money.refunds)} refunded` : "Paid orders in this period"} />
